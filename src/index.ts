@@ -33,20 +33,36 @@ app.get('/', (_req, res) => {
   res.json({
     message: 'StepAI API 서버가 실행 중입니다.',
     version: '1.0.0',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    status: 'ok'
+  });
+});
+
+// 간단한 헬스체크 (데이터베이스 연결 없이)
+app.get('/ping', (_req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
   });
 });
 
 // 헬스 체크
 app.get('/health', async (_req, res) => {
   try {
-    const dbConnected = await testConnection();
+    let dbConnected = false;
+    try {
+      dbConnected = await testConnection();
+    } catch (error) {
+      console.log('헬스체크 중 데이터베이스 연결 실패:', error);
+    }
     
     res.json({
       status: 'ok',
       timestamp: new Date().toISOString(),
       database: dbConnected ? 'connected' : 'disconnected',
-      environment: process.env['NODE_ENV'] || 'development'
+      environment: process.env['NODE_ENV'] || 'development',
+      uptime: process.uptime()
     });
   } catch (error) {
     res.status(500).json({
@@ -85,12 +101,13 @@ app.use((error: any, _req: express.Request, res: express.Response, _next: expres
 // 서버 시작
 const startServer = async () => {
   try {
-    // 데이터베이스 연결 테스트
-    const dbConnected = await testConnection();
-    
-    if (!dbConnected) {
-      console.error('데이터베이스 연결에 실패했습니다.');
-      process.exit(1);
+    // 데이터베이스 연결 테스트 (선택사항)
+    let dbConnected = false;
+    try {
+      dbConnected = await testConnection();
+      console.log(`📊 데이터베이스 연결: ${dbConnected ? '성공' : '실패'}`);
+    } catch (error) {
+      console.log('⚠️ 데이터베이스 연결 실패 (서버는 계속 시작됩니다):', error);
     }
 
     app.listen(PORT, () => {
@@ -99,6 +116,7 @@ const startServer = async () => {
       console.log(`📚 Swagger 문서: http://localhost:${PORT}/api-docs`);
       console.log(`🔗 API 문서: http://localhost:${PORT}/api`);
       console.log(`💚 헬스 체크: http://localhost:${PORT}/health`);
+      console.log(`💾 데이터베이스: ${dbConnected ? '연결됨' : '연결되지 않음'}`);
     });
   } catch (error) {
     console.error('서버 시작 실패:', error);
