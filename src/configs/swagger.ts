@@ -18,8 +18,8 @@ const options = {
         description: '개발 서버'
       },
       {
-        url: 'https://api.stepai.com',
-        description: '프로덕션 서버'
+        url: 'https://web-production-e8790.up.railway.app',
+        description: 'Railway 프로덕션 서버'
       }
     ],
     components: {
