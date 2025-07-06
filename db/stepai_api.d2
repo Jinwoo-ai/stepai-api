@@ -1,0 +1,121 @@
+# StepAI API Database Schema
+
+# Users 테이블
+users: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  username: varchar(50) 
+  email: varchar(100) {constraint: unique}
+  password_hash: varchar(255)
+  user_status: varchar(20) # active, inactive, pending, deleted
+  deleted_at: timestamp
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# company 테이블 
+company: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  company_name: varchar(100) {constraint: unique}
+  company_registration_number: varchar(20) {constraint: unique}
+  company_description: text
+  company_logo: varchar(255)
+  company_website: varchar(255)
+  company_email: varchar(100) {constraint: unique}
+  company_phone: varchar(20)
+  company_address: varchar(255)
+  company_status: varchar(20) # active, inactive, pending, deleted
+  deleted_at: timestamp
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# user_company 테이블
+user_company: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  user_id: int {constraint: foreign_key}
+  company_id: int {constraint: foreign_key}
+  role: varchar(20) # ceo, manager, employee
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# company_ai_services 테이블
+company_ai_services: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  company_id: int {constraint: foreign_key}
+  ai_service_id: int {constraint: foreign_key}
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# ai services 테이블
+ai_services: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  ai_name: varchar(100)
+  ai_description: text
+  ai_type: varchar(255)  # LLM, RAG, gpts, prompter, etc.
+  ai_status: varchar(20) # active, inactive, pending, deleted
+  nationality: varchar(20)
+  deleted_at: timestamp
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# ai_service_contents 테이블
+ai_service_contents: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  ai_service_id: int {constraint: foreign_key}
+  content_title: varchar(200)
+  content_url: varchar(255)
+  content_type: varchar(20) # link, logo, image, video, text, audio, pdf, etc.
+  content_description: text
+  content_order_index: int
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# ai_service_tags 테이블
+ai_service_tags: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  ai_service_id: int {constraint: foreign_key}
+  tag_name: varchar(100)
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# ai_categories 테이블
+ai_categories: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  category_name: varchar(100)
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# ai_service_categories 테이블
+ai_service_categories: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  ai_service_id: int {constraint: foreign_key}
+  category_id: int {constraint: foreign_key}
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+
+# 관계 정의
+ai_services -> ai_service_contents
+ai_services -> ai_service_tags
+ai_services -> ai_service_categories
+ai_categories -> ai_service_categories
+users -> user_company
+company -> user_company
+company -> company_ai_services
+ai_services -> company_ai_services
