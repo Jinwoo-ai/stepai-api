@@ -29,7 +29,7 @@ app.use(express.json({ limit: '10mb' })); // JSON 파싱
 app.use(express.urlencoded({ extended: true })); // URL 인코딩 파싱
 
 // 기본 라우트
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
   res.json({
     message: 'StepAI API 서버가 실행 중입니다.',
     version: '1.0.0',
@@ -38,7 +38,7 @@ app.get('/', (req, res) => {
 });
 
 // 헬스 체크
-app.get('/health', async (req, res) => {
+app.get('/health', async (_req, res) => {
   try {
     const dbConnected = await testConnection();
     
@@ -65,7 +65,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/ai-services', aiServiceRoutes);
 
 // 404 에러 핸들러
-app.use('*', (req, res) => {
+app.use('*', (_req, res) => {
   res.status(404).json({
     success: false,
     error: '요청한 엔드포인트를 찾을 수 없습니다.'
@@ -73,7 +73,7 @@ app.use('*', (req, res) => {
 });
 
 // 전역 에러 핸들러
-app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((error: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('서버 오류:', error);
   
   res.status(500).json({

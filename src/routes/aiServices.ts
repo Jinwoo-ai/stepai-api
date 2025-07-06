@@ -58,12 +58,12 @@ router.post('/', async (req, res) => {
     const result = await aiServiceService.createAIService(serviceData);
     
     if (result.success) {
-      res.status(201).json(result);
+      return res.status(201).json(result);
     } else {
-      res.status(400).json(result);
+      return res.status(400).json(result);
     }
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: '서버 오류가 발생했습니다.'
     });
@@ -123,12 +123,12 @@ router.get('/:id', async (req, res) => {
     const result = await aiServiceService.getAIServiceById(id);
     
     if (result.success) {
-      res.json(result);
+      return res.json(result);
     } else {
-      res.status(404).json(result);
+      return res.status(404).json(result);
     }
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: '서버 오류가 발생했습니다.'
     });
@@ -188,12 +188,12 @@ router.get('/:id/detail', async (req, res) => {
     const result = await aiServiceService.getAIServiceDetailById(id);
     
     if (result.success) {
-      res.json(result);
+      return res.json(result);
     } else {
-      res.status(404).json(result);
+      return res.status(404).json(result);
     }
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: '서버 오류가 발생했습니다.'
     });
@@ -341,12 +341,12 @@ router.get('/search', async (req, res) => {
     const result = await aiServiceService.searchAIServices(searchTerm);
     
     if (result.success) {
-      res.json(result);
+      return res.json(result);
     } else {
-      res.status(400).json(result);
+      return res.status(400).json(result);
     }
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: '서버 오류가 발생했습니다.'
     });
@@ -430,12 +430,12 @@ router.put('/:id', async (req, res) => {
     const result = await aiServiceService.updateAIService(id, serviceData);
     
     if (result.success) {
-      res.json(result);
+      return res.json(result);
     } else {
-      res.status(404).json(result);
+      return res.status(404).json(result);
     }
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: '서버 오류가 발생했습니다.'
     });
@@ -495,12 +495,12 @@ router.delete('/:id', async (req, res) => {
     const result = await aiServiceService.deleteAIService(id);
     
     if (result.success) {
-      res.json(result);
+      return res.json(result);
     } else {
-      res.status(404).json(result);
+      return res.status(404).json(result);
     }
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: '서버 오류가 발생했습니다.'
     });
@@ -533,7 +533,7 @@ router.delete('/:id', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/ApiResponse'
  */
-router.get('/stats/overview', async (req, res) => {
+router.get('/stats/overview', async (_req, res) => {
   try {
     const result = await aiServiceService.getAIServiceStats();
     

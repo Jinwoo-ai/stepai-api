@@ -58,12 +58,12 @@ router.post('/', async (req, res) => {
     const result = await userService.createUser(userData);
     
     if (result.success) {
-      res.status(201).json(result);
+      return res.status(201).json(result);
     } else {
-      res.status(400).json(result);
+      return res.status(400).json(result);
     }
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: '서버 오류가 발생했습니다.'
     });
@@ -123,12 +123,12 @@ router.get('/:id', async (req, res) => {
     const result = await userService.getUserById(id);
     
     if (result.success) {
-      res.json(result);
+      return res.json(result);
     } else {
-      res.status(404).json(result);
+      return res.status(404).json(result);
     }
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: '서버 오류가 발생했습니다.'
     });
@@ -189,12 +189,12 @@ router.get('/email/:email', async (req, res) => {
     const result = await userService.getUserByEmail(email);
     
     if (result.success) {
-      res.json(result);
+      return res.json(result);
     } else {
-      res.status(404).json(result);
+      return res.status(404).json(result);
     }
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: '서버 오류가 발생했습니다.'
     });
@@ -356,12 +356,12 @@ router.put('/:id', async (req, res) => {
     const result = await userService.updateUser(id, userData);
     
     if (result.success) {
-      res.json(result);
+      return res.json(result);
     } else {
-      res.status(404).json(result);
+      return res.status(404).json(result);
     }
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: '서버 오류가 발생했습니다.'
     });
@@ -421,12 +421,12 @@ router.delete('/:id', async (req, res) => {
     const result = await userService.deleteUser(id);
     
     if (result.success) {
-      res.json(result);
+      return res.json(result);
     } else {
-      res.status(404).json(result);
+      return res.status(404).json(result);
     }
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: '서버 오류가 발생했습니다.'
     });
