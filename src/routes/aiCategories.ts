@@ -159,6 +159,11 @@ router.get('/:id', async (req, res) => {
  *         schema:
  *           type: string
  *         description: 카테고리명 검색
+ *       - in: query
+ *         name: category_icon
+ *         schema:
+ *           type: string
+ *         description: 카테고리 아이콘 검색
  *     responses:
  *       200:
  *         description: AI 카테고리 목록 조회 성공
@@ -186,11 +191,13 @@ router.get('/', async (req, res) => {
     const page = parseInt(req.query['page'] as string) || 1;
     const limit = parseInt(req.query['limit'] as string) || 10;
     const category_name = req.query['category_name'] as string;
+    const category_icon = req.query['category_icon'] as string;
 
     const params: PaginationParams = { page, limit };
     const filters: any = {};
     
     if (category_name) filters.category_name = category_name;
+    if (category_icon) filters.category_icon = category_icon;
 
     const result = await aiCategoryService.getAICategories(params, filters);
     
@@ -230,6 +237,9 @@ router.get('/', async (req, res) => {
  *               category_name:
  *                 type: string
  *                 description: 카테고리명
+ *               category_icon:
+ *                 type: string
+ *                 description: 카테고리 아이콘
  *     responses:
  *       200:
  *         description: AI 카테고리 정보 수정 성공

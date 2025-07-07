@@ -79,6 +79,7 @@ export interface AIServiceTag {
 export interface AICategory {
   id?: number;
   category_name: string;
+  category_icon?: string;
   created_at?: Date;
   updated_at?: Date;
 }

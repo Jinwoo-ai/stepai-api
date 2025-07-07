@@ -7,8 +7,8 @@ class AICategoryService {
     try {
       const pool = getDatabaseConnection();
       const [result] = await pool.execute(
-        'INSERT INTO ai_categories (category_name) VALUES (?)',
-        [categoryData.category_name]
+        'INSERT INTO ai_categories (category_name, category_icon) VALUES (?, ?)',
+        [categoryData.category_name, categoryData.category_icon || null]
       );
 
       return {
@@ -67,9 +67,20 @@ class AICategoryService {
       const queryParams: any[] = [];
 
       // 필터 조건 추가
+      const whereConditions: string[] = [];
+      
       if (filters.category_name) {
-        query += ' WHERE category_name LIKE ?';
+        whereConditions.push('category_name LIKE ?');
         queryParams.push(`%${filters.category_name}%`);
+      }
+      
+      if (filters.category_icon) {
+        whereConditions.push('category_icon LIKE ?');
+        queryParams.push(`%${filters.category_icon}%`);
+      }
+      
+      if (whereConditions.length > 0) {
+        query += ' WHERE ' + whereConditions.join(' AND ');
       }
 
       query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
@@ -80,10 +91,23 @@ class AICategoryService {
 
       // 전체 개수 조회
       let countQuery = 'SELECT COUNT(*) as total FROM ai_categories';
+      const countParams: any[] = [];
+      
       if (filters.category_name) {
         countQuery += ' WHERE category_name LIKE ?';
+        countParams.push(`%${filters.category_name}%`);
       }
-      const [countResult] = await pool.execute(countQuery, filters.category_name ? [`%${filters.category_name}%`] : []);
+      
+      if (filters.category_icon) {
+        if (filters.category_name) {
+          countQuery += ' AND category_icon LIKE ?';
+        } else {
+          countQuery += ' WHERE category_icon LIKE ?';
+        }
+        countParams.push(`%${filters.category_icon}%`);
+      }
+      
+      const [countResult] = await pool.execute(countQuery, countParams);
       const total = (countResult as any)[0].total;
 
       return {
@@ -133,6 +157,11 @@ class AICategoryService {
       if (categoryData.category_name !== undefined) {
         updateFields.push('category_name = ?');
         updateValues.push(categoryData.category_name);
+      }
+
+      if (categoryData.category_icon !== undefined) {
+        updateFields.push('category_icon = ?');
+        updateValues.push(categoryData.category_icon);
       }
 
       if (updateFields.length === 0) {

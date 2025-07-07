@@ -191,6 +191,34 @@ const options = {
           },
           required: ['ai_service_id', 'tag_name']
         },
+        AICategory: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: '카테고리 ID'
+            },
+            category_name: {
+              type: 'string',
+              description: '카테고리명'
+            },
+            category_icon: {
+              type: 'string',
+              description: '카테고리 아이콘'
+            },
+            created_at: {
+              type: 'string',
+              format: 'date-time',
+              description: '생성일'
+            },
+            updated_at: {
+              type: 'string',
+              format: 'date-time',
+              description: '수정일'
+            }
+          },
+          required: ['category_name']
+        },
         ApiResponse: {
           type: 'object',
           properties: {
