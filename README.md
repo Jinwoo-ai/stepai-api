@@ -8,6 +8,7 @@ StepAI API는 AI 서비스 관리 시스템을 위한 RESTful API 서버입니�
 - **AI 서비스 관리**: AI 서비스 정보 관리
 - **콘텐츠 관리**: AI 서비스별 콘텐츠 관리
 - **태그 관리**: AI 서비스 태그 관리
+- **파일 업로드**: 이미지 및 파일 업로드 관리
 - **페이지네이션**: 대용량 데이터 처리
 - **필터링**: 다양한 조건으로 데이터 검색
 - **환경별 설정**: 개발, 스테이징, 프로덕션 환경 지원
@@ -79,6 +80,12 @@ npm start
 - `PUT /api/ai-services/:id` - AI 서비스 정보 수정
 - `DELETE /api/ai-services/:id` - AI 서비스 삭제
 - `GET /api/ai-services/stats/overview` - AI 서비스 통계
+
+### 파일 업로드 관리
+- `POST /api/assets/upload/:type` - 파일 업로드 (categories, companies, ai-services)
+- `GET /api/assets/list/:type` - 파일 목록 조회
+- `DELETE /api/assets/delete/:type/:filename` - 파일 삭제
+- `GET /assets/:type/:filename` - 파일 다운로드
 
 ### 헬스 체크
 - `GET /health` - 서버 상태 확인

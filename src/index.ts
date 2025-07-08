@@ -20,6 +20,7 @@ import aiServiceRoutes from './routes/aiServices';
 import aiServiceContentRoutes from './routes/aiServiceContents';
 import aiServiceTagRoutes from './routes/aiServiceTags';
 import aiCategoryRoutes from './routes/aiCategories';
+import assetRoutes from './routes/assets';
 
 const app = express();
 const PORT = process.env['PORT'] || 3000;
@@ -79,12 +80,16 @@ app.get('/health', async (_req, res) => {
 // Swagger UI 설정
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
+// 정적 파일 서빙 (Asset 파일들)
+app.use('/assets', express.static('public/assets'));
+
 // API 라우터 설정
 app.use('/api/users', userRoutes);
 app.use('/api/ai-services', aiServiceRoutes);
 app.use('/api/ai-service-contents', aiServiceContentRoutes);
 app.use('/api/ai-service-tags', aiServiceTagRoutes);
 app.use('/api/ai-categories', aiCategoryRoutes);
+app.use('/api/assets', assetRoutes);
 
 // 404 에러 핸들러
 app.use('*', (_req, res) => {
