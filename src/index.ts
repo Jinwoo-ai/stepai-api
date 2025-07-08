@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import { config } from 'dotenv';
 import swaggerUi from 'swagger-ui-express';
 import path from 'path';
+import fs from 'fs';
 
 // 환경 변수 로드
 config();
@@ -84,7 +85,22 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 // 정적 파일 서빙 (Asset 파일들)
 const assetsPath = path.join(__dirname, '../public/assets');
 console.log('Assets 경로:', assetsPath);
-app.use('/assets', express.static(assetsPath));
+
+// 배포 환경에서 정적 파일이 존재하는지 확인
+if (fs.existsSync(assetsPath)) {
+  console.log('✅ Assets 디렉토리가 존재합니다');
+  app.use('/assets', express.static(assetsPath));
+} else {
+  console.log('❌ Assets 디렉토리가 존재하지 않습니다:', assetsPath);
+  // 대체 경로 시도
+  const altAssetsPath = path.join(__dirname, 'public/assets');
+  if (fs.existsSync(altAssetsPath)) {
+    console.log('✅ 대체 Assets 경로 사용:', altAssetsPath);
+    app.use('/assets', express.static(altAssetsPath));
+  } else {
+    console.log('❌ 대체 Assets 경로도 존재하지 않습니다:', altAssetsPath);
+  }
+}
 
 // API 라우터 설정
 app.use('/api/users', userRoutes);
