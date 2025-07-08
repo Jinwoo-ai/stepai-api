@@ -1,5 +1,4 @@
 import multer from 'multer';
-import path from 'path';
 import fs from 'fs';
 
 // 업로드 디렉토리 생성
@@ -18,7 +17,7 @@ const createUploadDirs = () => {
 };
 
 // 파일 필터링
-const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   // 허용된 파일 타입
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
   
@@ -31,7 +30,7 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
 
 // 저장소 설정
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: (req, _file, cb) => {
     const type = req.params['type'] || 'general';
     const uploadPath = `public/assets/${type}`;
     
@@ -42,7 +41,7 @@ const storage = multer.diskStorage({
     
     cb(null, uploadPath);
   },
-  filename: (req, file, cb) => {
+  filename: (_req, file, cb) => {
     // 파일명 중복 방지를 위해 타임스탬프 추가
     const timestamp = Date.now();
     const originalName = file.originalname.replace(/[^a-zA-Z0-9.]/g, '');
