@@ -92,13 +92,27 @@ if (fs.existsSync(assetsPath)) {
   app.use('/assets', express.static(assetsPath));
 } else {
   console.log('❌ Assets 디렉토리가 존재하지 않습니다:', assetsPath);
-  // 대체 경로 시도
-  const altAssetsPath = path.join(__dirname, 'public/assets');
-  if (fs.existsSync(altAssetsPath)) {
-    console.log('✅ 대체 Assets 경로 사용:', altAssetsPath);
-    app.use('/assets', express.static(altAssetsPath));
-  } else {
-    console.log('❌ 대체 Assets 경로도 존재하지 않습니다:', altAssetsPath);
+  // 대체 경로들 시도
+  const altPaths = [
+    path.join(__dirname, 'public/assets'),
+    path.join(process.cwd(), 'public/assets'),
+    'public/assets'
+  ];
+  
+  let found = false;
+  for (const altPath of altPaths) {
+    if (fs.existsSync(altPath)) {
+      console.log('✅ 대체 Assets 경로 사용:', altPath);
+      app.use('/assets', express.static(altPath));
+      found = true;
+      break;
+    }
+  }
+  
+  if (!found) {
+    console.log('❌ 모든 Assets 경로를 찾을 수 없습니다');
+    // 기본 경로로 시도 (에러가 나지 않도록)
+    app.use('/assets', express.static('public/assets'));
   }
 }
 
