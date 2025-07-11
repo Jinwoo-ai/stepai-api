@@ -75,10 +75,12 @@ npm start
 
 ### AI 서비스 관리
 - `POST /api/ai-services` - AI 서비스 생성
-- `GET /api/ai-services` - AI 서비스 목록 조회
+- `GET /api/ai-services` - AI 서비스 목록 조회 (관련 데이터 포함 옵션 지원)
 - `GET /api/ai-services/:id` - AI 서비스 조회
+- `GET /api/ai-services/:id/detail` - AI 서비스 상세 조회 (관련 데이터 포함)
 - `PUT /api/ai-services/:id` - AI 서비스 정보 수정
 - `DELETE /api/ai-services/:id` - AI 서비스 삭제
+- `GET /api/ai-services/search` - AI 서비스 검색
 - `GET /api/ai-services/stats/overview` - AI 서비스 통계
 
 ### 파일 업로드 관리

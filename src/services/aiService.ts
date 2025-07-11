@@ -1,5 +1,5 @@
 import { getDatabaseConnection } from '../configs/database';
-import { AIService, ApiResponse, PaginationParams, PaginatedResponse, AIServiceFilters, AIServiceDetail } from '../types/database';
+import { AIService, ApiResponse, PaginationParams, PaginatedResponse, AIServiceFilters, AIServiceDetail, AIServiceListOptions, AIServiceWithRelations } from '../types/database';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 export class AIServiceService {
@@ -87,8 +87,8 @@ export class AIServiceService {
       // 관련 카테고리 조회
       const [categoryRows] = await this.db.execute<RowDataPacket[]>(
         `SELECT ac.* FROM ai_categories ac
-         INNER JOIN ai_service_categories asc ON ac.id = asc.category_id
-         WHERE asc.ai_service_id = ?`,
+         INNER JOIN ai_service_categories aisc ON ac.id = aisc.category_id
+         WHERE aisc.ai_service_id = ?`,
         [id]
       );
 
@@ -121,7 +121,7 @@ export class AIServiceService {
   }
 
   // AI 서비스 목록 조회 (페이지네이션)
-  async getAIServices(params: PaginationParams, filters?: AIServiceFilters): Promise<ApiResponse<PaginatedResponse<AIService>>> {
+  async getAIServices(params: PaginationParams, filters?: AIServiceFilters, options?: AIServiceListOptions): Promise<ApiResponse<PaginatedResponse<AIServiceWithRelations>>> {
     try {
       const { page, limit } = params;
       const offset = (page - 1) * limit;
@@ -164,12 +164,81 @@ export class AIServiceService {
         [...queryParams, limit, offset]
       );
 
+      const services = rows as AIService[];
+
+      // 관련 데이터 포함 옵션이 있는 경우
+      if (options && (options.include_contents || options.include_tags || options.include_categories || options.include_companies)) {
+        const servicesWithRelations: AIServiceWithRelations[] = [];
+
+        for (const service of services) {
+          const serviceWithRelations: AIServiceWithRelations = { ...service };
+
+          // 콘텐츠 포함
+          if (options.include_contents) {
+            const [contentRows] = await this.db.execute<RowDataPacket[]>(
+              'SELECT * FROM ai_service_contents WHERE ai_service_id = ? ORDER BY content_order_index ASC',
+              [service.id]
+            );
+            serviceWithRelations.contents = contentRows as any[];
+          }
+
+          // 태그 포함
+          if (options.include_tags) {
+            const [tagRows] = await this.db.execute<RowDataPacket[]>(
+              'SELECT * FROM ai_service_tags WHERE ai_service_id = ? ORDER BY tag_name ASC',
+              [service.id]
+            );
+            serviceWithRelations.tags = tagRows as any[];
+          }
+
+          // 카테고리 포함
+          if (options.include_categories) {
+            const [categoryRows] = await this.db.execute<RowDataPacket[]>(
+              `SELECT ac.* FROM ai_categories ac
+               INNER JOIN ai_service_categories aisc ON ac.id = aisc.category_id
+               WHERE aisc.ai_service_id = ?`,
+              [service.id]
+            );
+            serviceWithRelations.categories = categoryRows as any[];
+          }
+
+          // 회사 포함
+          if (options.include_companies) {
+            const [companyRows] = await this.db.execute<RowDataPacket[]>(
+              `SELECT c.* FROM company c
+               INNER JOIN company_ai_services cas ON c.id = cas.company_id
+               WHERE cas.ai_service_id = ? AND c.deleted_at IS NULL`,
+              [service.id]
+            );
+            serviceWithRelations.companies = companyRows as any[];
+          }
+
+          servicesWithRelations.push(serviceWithRelations);
+        }
+
+        const totalPages = Math.ceil(total / limit);
+
+        return {
+          success: true,
+          data: {
+            data: servicesWithRelations,
+            pagination: {
+              page,
+              limit,
+              total,
+              totalPages
+            }
+          }
+        };
+      }
+
+      // 관련 데이터 포함 옵션이 없는 경우 기존 방식
       const totalPages = Math.ceil(total / limit);
 
       return {
         success: true,
         data: {
-          data: rows as AIService[],
+          data: services as AIServiceWithRelations[],
           pagination: {
             page,
             limit,

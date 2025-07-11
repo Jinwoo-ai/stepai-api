@@ -154,4 +154,20 @@ export interface AIServiceDetail extends AIService {
   tags?: AIServiceTag[];
   categories?: AICategory[];
   companies?: Company[];
+}
+
+// AI 서비스 목록 조회 옵션
+export interface AIServiceListOptions {
+  include_contents?: boolean;
+  include_tags?: boolean;
+  include_categories?: boolean;
+  include_companies?: boolean;
+}
+
+// AI 서비스 목록 응답 타입
+export interface AIServiceWithRelations extends AIService {
+  contents?: AIServiceContent[];
+  tags?: AIServiceTag[];
+  categories?: AICategory[];
+  companies?: Company[];
 } 

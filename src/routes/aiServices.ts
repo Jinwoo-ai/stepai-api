@@ -1,6 +1,6 @@
 import express from 'express';
 import aiServiceService from '../services/aiService';
-import { AIService, PaginationParams, AIServiceFilters } from '../types/database';
+import { AIService, PaginationParams, AIServiceFilters, AIServiceListOptions } from '../types/database';
 
 const router = express.Router();
 
@@ -240,6 +240,26 @@ router.get('/:id/detail', async (req, res) => {
  *         schema:
  *           type: integer
  *         description: 카테고리 ID 필터
+ *       - in: query
+ *         name: include_contents
+ *         schema:
+ *           type: boolean
+ *         description: 콘텐츠 정보 포함 여부
+ *       - in: query
+ *         name: include_tags
+ *         schema:
+ *           type: boolean
+ *         description: 태그 정보 포함 여부
+ *       - in: query
+ *         name: include_categories
+ *         schema:
+ *           type: boolean
+ *         description: 카테고리 정보 포함 여부
+ *       - in: query
+ *         name: include_companies
+ *         schema:
+ *           type: boolean
+ *         description: 회사 정보 포함 여부
  *     responses:
  *       200:
  *         description: AI 서비스 목록 조회 성공
@@ -271,15 +291,28 @@ router.get('/', async (req, res) => {
     const nationality = req.query['nationality'] as string;
     const category_id = req.query['category_id'] ? parseInt(req.query['category_id'] as string) : undefined;
 
+    // 관련 데이터 포함 옵션 파싱
+    const include_contents = req.query['include_contents'] === 'true';
+    const include_tags = req.query['include_tags'] === 'true';
+    const include_categories = req.query['include_categories'] === 'true';
+    const include_companies = req.query['include_companies'] === 'true';
+
     const params: PaginationParams = { page, limit };
     const filters: AIServiceFilters = {};
+    const options: AIServiceListOptions = {};
     
     if (ai_status) filters.ai_status = ai_status;
     if (ai_type) filters.ai_type = ai_type;
     if (nationality) filters.nationality = nationality;
     if (category_id) filters.category_id = category_id;
 
-    const result = await aiServiceService.getAIServices(params, filters);
+    // 관련 데이터 포함 옵션 설정
+    if (include_contents) options.include_contents = true;
+    if (include_tags) options.include_tags = true;
+    if (include_categories) options.include_categories = true;
+    if (include_companies) options.include_companies = true;
+
+    const result = await aiServiceService.getAIServices(params, filters, options);
     
     if (result.success) {
       res.json(result);

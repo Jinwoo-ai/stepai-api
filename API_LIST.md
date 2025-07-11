@@ -81,7 +81,11 @@ StepAI API는 AI 서비스 관리 시스템을 위한 RESTful API입니다. 모�
   - `ai_type`: AI 서비스 타입 필터
   - `nationality`: 국가 필터
   - `category_id`: 카테고리 ID 필터
-- **Response**: AI 서비스 목록 및 페이지네이션 정보
+  - `include_contents`: 콘텐츠 정보 포함 여부 (boolean)
+  - `include_tags`: 태그 정보 포함 여부 (boolean)
+  - `include_categories`: 카테고리 정보 포함 여부 (boolean)
+  - `include_companies`: 회사 정보 포함 여부 (boolean)
+- **Response**: AI 서비스 목록 및 페이지네이션 정보 (선택한 관련 데이터 포함)
 
 ### AI 서비스 조회 (ID)
 - **HTTP Method**: `GET`
