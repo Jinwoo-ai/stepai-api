@@ -108,4 +108,4 @@ Thumbs.db
 *.backup
 
 # Uploaded files (개발 환경에서만)
-public/assets/ 
+# public/assets/
