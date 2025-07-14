@@ -1,24 +1,52 @@
 import { getDatabaseConnection } from '../configs/database';
-import { AIService, ApiResponse, PaginationParams, PaginatedResponse, AIServiceFilters, AIServiceDetail, AIServiceListOptions, AIServiceWithRelations } from '../types/database';
+import { AIService, ApiResponse, PaginationParams, PaginatedResponse, AIServiceFilters, AIServiceDetail, AIServiceListOptions, AIServiceWithRelations, AIServiceCreateRequest } from '../types/database';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 export class AIServiceService {
   private db = getDatabaseConnection();
 
   // AI 서비스 생성
-  async createAIService(serviceData: AIService): Promise<ApiResponse<AIService>> {
+  async createAIService(serviceData: AIServiceCreateRequest): Promise<ApiResponse<AIService>> {
     try {
-      const [result] = await this.db.execute<ResultSetHeader>(
-        'INSERT INTO ai_services (ai_name, ai_description, ai_type, ai_status, nationality) VALUES (?, ?, ?, ?, ?)',
-        [serviceData.ai_name, serviceData.ai_description, serviceData.ai_type, serviceData.ai_status, serviceData.nationality]
-      );
+      // 트랜잭션 시작
+      const connection = await this.db.getConnection();
+      await connection.beginTransaction();
 
-      const newService = { ...serviceData, id: result.insertId };
-      return {
-        success: true,
-        data: newService,
-        message: 'AI 서비스가 성공적으로 생성되었습니다.'
-      };
+      try {
+        // AI 서비스 기본 정보 생성
+        const [result] = await connection.execute<ResultSetHeader>(
+          'INSERT INTO ai_services (ai_name, ai_description, ai_type, ai_status, nationality) VALUES (?, ?, ?, ?, ?)',
+          [serviceData.ai_name, serviceData.ai_description, serviceData.ai_type, serviceData.ai_status || 'active', serviceData.nationality]
+        );
+
+        const newServiceId = result.insertId;
+
+        // 카테고리 연결 처리
+        if (serviceData.category_ids && serviceData.category_ids.length > 0) {
+          for (const categoryId of serviceData.category_ids) {
+            await connection.execute(
+              'INSERT INTO ai_service_categories (ai_service_id, category_id) VALUES (?, ?)',
+              [newServiceId, categoryId]
+            );
+          }
+        }
+
+        // 트랜잭션 커밋
+        await connection.commit();
+        connection.release();
+
+        const newService = { ...serviceData, id: newServiceId };
+        return {
+          success: true,
+          data: newService,
+          message: 'AI 서비스가 성공적으로 생성되었습니다.'
+        };
+      } catch (error) {
+        // 트랜잭션 롤백
+        await connection.rollback();
+        connection.release();
+        throw error;
+      }
     } catch (error) {
       return {
         success: false,

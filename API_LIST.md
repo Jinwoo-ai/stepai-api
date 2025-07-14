@@ -66,7 +66,8 @@ StepAI API는 AI 서비스 관리 시스템을 위한 RESTful API입니다. 모�
     "ai_description": "AI 서비스 설명",
     "ai_type": "LLM",
     "ai_status": "active",
-    "nationality": "한국"
+    "nationality": "한국",
+    "category_ids": [1, 2, 3]
   }
   ```
 - **Response**: 생성된 AI 서비스 정보

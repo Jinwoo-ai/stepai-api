@@ -1,6 +1,6 @@
 import express from 'express';
 import aiServiceService from '../services/aiService';
-import { AIService, PaginationParams, AIServiceFilters, AIServiceListOptions } from '../types/database';
+import { AIService, PaginationParams, AIServiceFilters, AIServiceListOptions, AIServiceCreateRequest } from '../types/database';
 
 const router = express.Router();
 
@@ -22,7 +22,32 @@ const router = express.Router();
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/AIService'
+ *             type: object
+ *             properties:
+ *               ai_name:
+ *                 type: string
+ *                 description: AI 서비스명
+ *               ai_description:
+ *                 type: string
+ *                 description: AI 서비스 설명
+ *               ai_type:
+ *                 type: string
+ *                 description: AI 서비스 타입
+ *               ai_status:
+ *                 type: string
+ *                 enum: [active, inactive, pending, deleted]
+ *                 description: AI 서비스 상태
+ *               nationality:
+ *                 type: string
+ *                 description: 국가
+ *               category_ids:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 description: 연결할 카테고리 ID 배열
+ *             required:
+ *               - ai_name
+ *               - ai_type
  *     responses:
  *       201:
  *         description: AI 서비스가 성공적으로 생성됨
@@ -45,7 +70,7 @@ const router = express.Router();
  */
 router.post('/', async (req, res) => {
   try {
-    const serviceData: AIService = req.body;
+    const serviceData: AIServiceCreateRequest = req.body;
     
     // 필수 필드 검증
     if (!serviceData.ai_name || !serviceData.ai_type) {

@@ -56,6 +56,11 @@ export interface AIService {
   updated_at?: Date;
 }
 
+// AI 서비스 생성 요청 타입 (카테고리 ID 포함)
+export interface AIServiceCreateRequest extends AIService {
+  category_ids?: number[];
+}
+
 export interface AIServiceContent {
   id?: number;
   ai_service_id: number;
