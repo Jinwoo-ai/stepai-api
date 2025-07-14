@@ -1,6 +1,6 @@
 import express from 'express';
 import aiServiceService from '../services/aiService';
-import { AIService, PaginationParams, AIServiceFilters, AIServiceListOptions, AIServiceCreateRequest } from '../types/database';
+import { PaginationParams, AIServiceFilters, AIServiceListOptions, AIServiceCreateRequest } from '../types/database';
 
 const router = express.Router();
 
