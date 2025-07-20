@@ -276,7 +276,9 @@ export interface AIServiceCreateRequest {
   ai_name: string;
   ai_description?: string;
   ai_type: string;
+  ai_status?: 'active' | 'inactive' | 'pending' | 'deleted';
   nationality?: string;
+  category_ids?: number[];
 }
 
 export interface AIServiceUpdateRequest {
@@ -291,6 +293,14 @@ export interface AIServiceFilters {
   ai_status?: string;
   ai_type?: string;
   nationality?: string;
+  category_id?: number;
+}
+
+export interface AIServiceListOptions {
+  include_contents?: boolean;
+  include_tags?: boolean;
+  include_categories?: boolean;
+  include_companies?: boolean;
 }
 
 // Contents 관련 타입들

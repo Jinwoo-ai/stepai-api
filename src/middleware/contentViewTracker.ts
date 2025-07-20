@@ -8,7 +8,7 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
-export const trackContentView = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const trackContentView = async (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
   try {
     // 콘텐츠 조회 API인지 확인
     const isContentView = req.method === 'GET' && 

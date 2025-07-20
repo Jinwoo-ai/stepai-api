@@ -23,8 +23,8 @@ const createUploadDir = (type: string) => {
 
 // Multer 설정
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const type = req.params['type'];
+  destination: (_req, _file, cb) => {
+    const type = _req.params['type'];
     if (type) {
       const uploadPath = createUploadDir(type);
       cb(null, uploadPath);
@@ -32,7 +32,7 @@ const storage = multer.diskStorage({
       cb(new Error('업로드 타입이 지정되지 않았습니다.'), '');
     }
   },
-  filename: (req, file, cb) => {
+  filename: (_req, file, cb) => {
     // 원본 파일명 유지하되 중복 방지
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
@@ -46,7 +46,7 @@ const upload = multer({
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB 제한
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     // 허용된 파일 타입 체크
     const allowedTypes = /jpeg|jpg|png|gif|ico|svg|webp/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -122,7 +122,7 @@ router.post('/upload/:type', upload.single('file'), (req, res) => {
 
     console.log(`📁 파일 업로드 성공: ${type}/${fileName}`);
 
-    res.json({
+    return res.json({
       success: true,
       data: {
         filename: fileName,
@@ -135,7 +135,7 @@ router.post('/upload/:type', upload.single('file'), (req, res) => {
     });
   } catch (error) {
     console.error('파일 업로드 오류:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: '파일 업로드 중 오류가 발생했습니다.'
     });
@@ -200,14 +200,14 @@ router.get('/list/:type', (req, res) => {
         };
       });
 
-    res.json({
+    return res.json({
       success: true,
       data: files,
       message: `${type} 파일 목록 조회 성공`
     });
   } catch (error) {
     console.error('파일 목록 조회 오류:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: '파일 목록 조회 중 오류가 발생했습니다.'
     });
@@ -270,13 +270,13 @@ router.delete('/delete/:type/:filename', (req, res) => {
     fs.unlinkSync(filePath);
     console.log(`🗑️ 파일 삭제 성공: ${type}/${filename}`);
 
-    res.json({
+    return res.json({
       success: true,
       message: '파일이 성공적으로 삭제되었습니다.'
     });
   } catch (error) {
     console.error('파일 삭제 오류:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: '파일 삭제 중 오류가 발생했습니다.'
     });
@@ -284,7 +284,7 @@ router.delete('/delete/:type/:filename', (req, res) => {
 });
 
 // 에러 핸들러 (multer 에러 처리)
-router.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+router.use((error: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
@@ -301,7 +301,7 @@ router.use((error: any, req: express.Request, res: express.Response, next: expre
     });
   }
 
-  next(error);
+  return next(error);
 });
 
 export default router; 

@@ -337,7 +337,7 @@ router.get('/', async (req, res) => {
     if (include_categories) options.include_categories = true;
     if (include_companies) options.include_companies = true;
 
-    const result = await aiServiceService.getAIServices(params, filters, options);
+    const result = await aiServiceService.getAIServices(params, filters);
     
     if (result.success) {
       res.json(result);

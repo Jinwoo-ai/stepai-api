@@ -1,12 +1,10 @@
 import { getDatabaseConnection } from '../configs/database';
 import { 
   RankingWeight, 
-  Ranking, 
   RankingResult, 
   RankingFilters, 
   RankingWeightUpdate,
-  RankingData,
-  RankingApiResponse 
+  RankingData
 } from '../types/database';
 
 class RankingService {
@@ -15,7 +13,7 @@ class RankingService {
   // 콘텐츠 조회 기록 추가
   async recordContentView(contentId: number, userId?: number, ipAddress?: string, userAgent?: string): Promise<boolean> {
     try {
-      const [result] = await this.pool.execute(
+      await this.pool.execute(
         'INSERT INTO content_views (content_id, user_id, ip_address, user_agent) VALUES (?, ?, ?, ?)',
         [contentId, userId, ipAddress, userAgent]
       );
