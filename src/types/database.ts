@@ -406,3 +406,81 @@ export interface ReviewFilters {
   content_id?: number;
   rating?: number;
 } 
+
+// 랭킹 관련 타입들
+export interface ContentView {
+  id: number;
+  content_id: number;
+  user_id?: number;
+  view_date: Date;
+  ip_address?: string;
+  user_agent?: string;
+  created_at: Date;
+}
+
+export interface RankingWeight {
+  id: number;
+  ranking_type: 'ai_service' | 'content' | 'expert' | 'category';
+  weight_name: string;
+  weight_value: number;
+  weight_description?: string;
+  is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface Ranking {
+  id: number;
+  ranking_type: 'ai_service' | 'content' | 'expert' | 'category';
+  entity_id: number;
+  entity_type: 'ai_service_id' | 'content_id' | 'expert_id' | 'category_id';
+  total_score: number;
+  view_count: number;
+  request_count: number;
+  avg_rating: number;
+  ranking_date: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface RankingResult {
+  entity_id: number;
+  entity_name: string;
+  total_score: number;
+  view_count: number;
+  request_count: number;
+  avg_rating: number;
+  rank: number;
+}
+
+export interface RankingFilters {
+  ranking_type?: 'ai_service' | 'content' | 'expert' | 'category';
+  date_from?: Date;
+  date_to?: Date;
+  limit?: number;
+}
+
+export interface RankingWeightUpdate {
+  ranking_type: 'ai_service' | 'content' | 'expert' | 'category';
+  weight_name: string;
+  weight_value: number;
+  weight_description?: string;
+}
+
+// 랭킹 계산을 위한 데이터 구조
+export interface RankingData {
+  entity_id: number;
+  entity_name: string;
+  view_count: number;
+  request_count: number;
+  avg_rating: number;
+  content_count?: number;
+}
+
+// 랭킹 API 응답 타입
+export interface RankingApiResponse {
+  success: boolean;
+  data?: RankingResult[];
+  error?: string;
+  message?: string;
+} 

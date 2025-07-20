@@ -1,141 +1,170 @@
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import { config } from 'dotenv';
 import swaggerUi from 'swagger-ui-express';
+import swaggerJsdoc from 'swagger-jsdoc';
 import path from 'path';
-import fs from 'fs';
-
-// 환경 변수 로드
-config();
-
-// 데이터베이스 연결 테스트
 import { testConnection } from './configs/database';
+import { trackContentView } from './middleware/contentViewTracker';
 
-// Swagger 설정
-import { specs } from './configs/swagger';
-
-// 라우터 임포트
-import userRoutes from './routes/users';
-import groupRoutes from './routes/groups';
-import expertRoutes from './routes/experts';
-import contentRoutes from './routes/contents';
-import aiServiceRoutes from './routes/aiServices';
-import assetRoutes from './routes/assets';
+// 라우터들 import
+import usersRouter from './routes/users';
+import groupsRouter from './routes/groups';
+import expertsRouter from './routes/experts';
+import contentsRouter from './routes/contents';
+import aiServicesRouter from './routes/aiServices';
+import rankingsRouter from './routes/rankings';
+import assetsRouter from './routes/assets';
 
 const app = express();
 const PORT = process.env['PORT'] || 3000;
 
 // 미들웨어 설정
-app.use(helmet()); // 보안 헤더 설정
-app.use(cors()); // CORS 설정
-app.use(morgan('combined')); // 로깅
-app.use(express.json({ limit: '10mb' })); // JSON 파싱
-app.use(express.urlencoded({ extended: true })); // URL 인코딩 파싱
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// 기본 라우트
-app.get('/', (_req, res) => {
-  res.json({
-    message: 'StepAI API 서버가 실행 중입니다.',
-    version: '1.0.0',
-    timestamp: new Date().toISOString(),
-    status: 'ok'
-  });
-});
+// 콘텐츠 조회 추적 미들웨어 (라우터보다 먼저 적용)
+app.use(trackContentView);
 
-// 간단한 헬스체크 (데이터베이스 연결 없이)
-app.get('/ping', (_req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
-});
+// 정적 파일 서빙
+app.use('/assets', express.static(path.join(__dirname, '../public/assets')));
+app.use('/public', express.static(path.join(__dirname, '../public')));
 
-// 헬스 체크
-app.get('/health', async (_req, res) => {
-  try {
-    let dbConnected = false;
-    try {
-      dbConnected = await testConnection();
-    } catch (error) {
-      console.log('헬스체크 중 데이터베이스 연결 실패:', error);
+// Swagger 설정
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'StepAI API',
+      version: '1.0.0',
+      description: 'AI 전문가 매칭 서비스 API',
+    },
+    servers: [
+      {
+        url: process.env['NODE_ENV'] === 'production' 
+          ? 'https://web-production-e8790.up.railway.app' 
+          : `http://localhost:${PORT}`,
+        description: process.env['NODE_ENV'] === 'production' ? 'Production server' : 'Development server',
+      },
+    ],
+    components: {
+      schemas: {
+        ApiResponse: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean',
+              description: '요청 성공 여부'
+            },
+            data: {
+              type: 'object',
+              description: '응답 데이터'
+            },
+            error: {
+              type: 'string',
+              description: '오류 메시지'
+            },
+            message: {
+              type: 'string',
+              description: '성공 메시지'
+            }
+          }
+        },
+        PaginatedResponse: {
+          type: 'object',
+          properties: {
+            pagination: {
+              type: 'object',
+              properties: {
+                page: {
+                  type: 'integer',
+                  description: '현재 페이지'
+                },
+                limit: {
+                  type: 'integer',
+                  description: '페이지당 항목 수'
+                },
+                total: {
+                  type: 'integer',
+                  description: '전체 항목 수'
+                },
+                totalPages: {
+                  type: 'integer',
+                  description: '전체 페이지 수'
+                }
+              }
+            }
+          }
+        }
+      }
     }
-    
+  },
+  apis: ['./src/routes/*.ts'],
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+
+// Swagger UI 설정
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// API 라우터들
+app.use('/api/users', usersRouter);
+app.use('/api/groups', groupsRouter);
+app.use('/api/experts', expertsRouter);
+app.use('/api/contents', contentsRouter);
+app.use('/api/ai-services', aiServicesRouter);
+app.use('/api/rankings', rankingsRouter);
+app.use('/api/assets', assetsRouter);
+
+// 헬스체크 엔드포인트
+app.get('/health', async (req, res) => {
+  try {
+    const dbConnected = await testConnection();
     res.json({
       status: 'ok',
       timestamp: new Date().toISOString(),
       database: dbConnected ? 'connected' : 'disconnected',
-      environment: process.env['NODE_ENV'] || 'development',
-      uptime: process.uptime()
+      environment: process.env['NODE_ENV'] || 'development'
     });
   } catch (error) {
     res.status(500).json({
       status: 'error',
-      message: '서버 상태 확인 중 오류가 발생했습니다.',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      timestamp: new Date().toISOString(),
+      error: 'Health check failed'
     });
   }
 });
 
-// Swagger UI 설정
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
-
-// 정적 파일 서빙 (Asset 파일들)
-const assetsPath = path.join(__dirname, '../public/assets');
-console.log('Assets 경로:', assetsPath);
-
-// 배포 환경에서 정적 파일이 존재하는지 확인
-if (fs.existsSync(assetsPath)) {
-  console.log('✅ Assets 디렉토리가 존재합니다');
-  app.use('/assets', express.static(assetsPath));
-} else {
-  console.log('❌ Assets 디렉토리가 존재하지 않습니다:', assetsPath);
-  // 대체 경로들 시도
-  const altPaths = [
-    path.join(__dirname, 'public/assets'),
-    path.join(process.cwd(), 'public/assets'),
-    'public/assets'
-  ];
-  
-  let found = false;
-  for (const altPath of altPaths) {
-    if (fs.existsSync(altPath)) {
-      console.log('✅ 대체 Assets 경로 사용:', altPath);
-      app.use('/assets', express.static(altPath));
-      found = true;
-      break;
+// 루트 엔드포인트
+app.get('/', (req, res) => {
+  res.json({
+    message: 'StepAI API 서버가 실행 중입니다.',
+    version: '1.0.0',
+    endpoints: {
+      docs: '/api-docs',
+      health: '/health',
+      users: '/api/users',
+      groups: '/api/groups',
+      experts: '/api/experts',
+      contents: '/api/contents',
+      aiServices: '/api/ai-services',
+      rankings: '/api/rankings',
+      assets: '/api/assets'
     }
-  }
-  
-  if (!found) {
-    console.log('❌ 모든 Assets 경로를 찾을 수 없습니다');
-    // 기본 경로로 시도 (에러가 나지 않도록)
-    app.use('/assets', express.static('public/assets'));
-  }
-}
+  });
+});
 
-// API 라우터 설정
-app.use('/api/users', userRoutes);
-app.use('/api/groups', groupRoutes);
-app.use('/api/experts', expertRoutes);
-app.use('/api/contents', contentRoutes);
-app.use('/api/ai-services', aiServiceRoutes);
-app.use('/api/assets', assetRoutes);
-
-// 404 에러 핸들러
-app.use('*', (_req, res) => {
+// 404 핸들러
+app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
     error: '요청한 엔드포인트를 찾을 수 없습니다.'
   });
 });
 
-// 전역 에러 핸들러
-app.use((error: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error('서버 오류:', error);
-  
+// 에러 핸들러
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Error:', err);
   res.status(500).json({
     success: false,
     error: '서버 내부 오류가 발생했습니다.'
@@ -143,59 +172,12 @@ app.use((error: any, _req: express.Request, res: express.Response, _next: expres
 });
 
 // 서버 시작
-const startServer = async () => {
-  try {
-    // 데이터베이스 연결 테스트 (선택사항)
-    let dbConnected = false;
-    try {
-      dbConnected = await testConnection();
-      console.log(`📊 데이터베이스 연결: ${dbConnected ? '성공' : '실패'}`);
-    } catch (error) {
-      console.log('⚠️ 데이터베이스 연결 실패 (서버는 계속 시작됩니다):', error);
-    }
-
-    app.listen(PORT, () => {
-      console.log(`🚀 StepAI API 서버가 포트 ${PORT}에서 실행 중입니다.`);
-      console.log(`📊 환경: ${process.env['NODE_ENV'] || 'development'}`);
-      console.log(`📚 Swagger 문서: http://localhost:${PORT}/api-docs`);
-      console.log(`🔗 API 문서: http://localhost:${PORT}/api`);
-      console.log(`💚 헬스 체크: http://localhost:${PORT}/health`);
-      console.log(`💾 데이터베이스: ${dbConnected ? '연결됨' : '연결되지 않음'}`);
-    });
-  } catch (error) {
-    console.error('서버 시작 실패:', error);
-    process.exit(1);
-  }
-};
-
-// 프로세스 종료 시 정리
-process.on('SIGINT', async () => {
-  console.log('\n🛑 서버를 종료합니다...');
-  
-  try {
-    const { closeDatabaseConnection } = await import('./configs/database');
-    await closeDatabaseConnection();
-    console.log('✅ 데이터베이스 연결이 종료되었습니다.');
-  } catch (error) {
-    console.error('❌ 데이터베이스 연결 종료 중 오류:', error);
-  }
-  
-  process.exit(0);
+app.listen(PORT, () => {
+  console.log(`🚀 StepAI API 서버가 포트 ${PORT}에서 실행 중입니다.`);
+  console.log(`📚 API 문서: http://localhost:${PORT}/api-docs`);
+  console.log(`💚 헬스체크: http://localhost:${PORT}/health`);
+  console.log(`📊 콘텐츠 조회 추적이 활성화되었습니다.`);
 });
 
-process.on('SIGTERM', async () => {
-  console.log('\n🛑 서버를 종료합니다...');
-  
-  try {
-    const { closeDatabaseConnection } = await import('./configs/database');
-    await closeDatabaseConnection();
-    console.log('✅ 데이터베이스 연결이 종료되었습니다.');
-  } catch (error) {
-    console.error('❌ 데이터베이스 연결 종료 중 오류:', error);
-  }
-  
-  process.exit(0);
-});
+export default app;
 
-// 서버 시작
-startServer();

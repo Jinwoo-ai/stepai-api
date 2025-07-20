@@ -7,15 +7,12 @@ CREATE TABLE users (
   username VARCHAR(50) NOT NULL,
   email VARCHAR(100) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  user_type VARCHAR(20) NOT NULL DEFAULT 'client' COMMENT 'client, expert, admin',
-  user_status VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT 'active, inactive, pending, deleted',
+  user_type VARCHAR(20) DEFAULT 'client', -- client, expert, admin
+  user_status VARCHAR(20) DEFAULT 'active', -- active, inactive, pending, deleted
   deleted_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_user_status (user_status),
-  INDEX idx_user_type (user_type),
-  INDEX idx_deleted_at (deleted_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
 
 -- Groups 테이블 (전문가 그룹)
 CREATE TABLE groups (
@@ -27,69 +24,11 @@ CREATE TABLE groups (
   group_email VARCHAR(100),
   group_phone VARCHAR(20),
   group_address VARCHAR(255),
-  group_status VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT 'active, inactive, pending, deleted',
+  group_status VARCHAR(20) DEFAULT 'active', -- active, inactive, pending, deleted
   deleted_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_group_status (group_status),
-  INDEX idx_deleted_at (deleted_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- AI Services 테이블 (AI 서비스)
-CREATE TABLE ai_services (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ai_name VARCHAR(100) NOT NULL,
-  ai_description TEXT,
-  ai_type VARCHAR(255) NOT NULL COMMENT 'LLM, RAG, gpts, prompter, etc.',
-  ai_status VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT 'active, inactive, pending, deleted',
-  nationality VARCHAR(20),
-  deleted_at TIMESTAMP NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_ai_status (ai_status),
-  INDEX idx_ai_type (ai_type),
-  INDEX idx_nationality (nationality),
-  INDEX idx_deleted_at (deleted_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Content Categories 테이블 (콘텐츠 카테고리)
-CREATE TABLE content_categories (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  category_name VARCHAR(100) NOT NULL,
-  category_icon VARCHAR(255),
-  category_description TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_category_name (category_name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Content Tags 테이블 (콘텐츠 태그)
-CREATE TABLE content_tags (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  tag_name VARCHAR(100) NOT NULL,
-  tag_description TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_tag_name (tag_name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Contents 테이블 (AI로 만든 결과물)
-CREATE TABLE contents (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  content_title VARCHAR(200) NOT NULL,
-  content_description TEXT,
-  content_url VARCHAR(255),
-  content_type VARCHAR(20) NOT NULL COMMENT 'link, logo, image, video, text, audio, pdf, etc.',
-  content_order_index INT DEFAULT 0,
-  content_status VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT 'active, inactive, pending, deleted',
-  deleted_at TIMESTAMP NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_content_status (content_status),
-  INDEX idx_content_type (content_type),
-  INDEX idx_content_order (content_order_index),
-  INDEX idx_deleted_at (deleted_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
 
 -- Experts 테이블 (AI 전문가)
 CREATE TABLE experts (
@@ -104,16 +43,59 @@ CREATE TABLE experts (
   expert_email VARCHAR(100),
   expert_phone VARCHAR(20),
   expert_location VARCHAR(255),
-  expert_status VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT 'active, inactive, pending, deleted',
+  expert_status VARCHAR(20) DEFAULT 'active', -- active, inactive, pending, deleted
   deleted_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE SET NULL,
-  INDEX idx_expert_status (expert_status),
-  INDEX idx_expert_location (expert_location),
-  INDEX idx_deleted_at (deleted_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (group_id) REFERENCES groups(id)
+);
+
+-- AI Services 테이블 (AI 서비스)
+CREATE TABLE ai_services (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ai_name VARCHAR(100) NOT NULL,
+  ai_description TEXT,
+  ai_type VARCHAR(255) NOT NULL, -- LLM, RAG, gpts, prompter, etc.
+  ai_status VARCHAR(20) DEFAULT 'active', -- active, inactive, pending, deleted
+  nationality VARCHAR(20),
+  deleted_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Content Categories 테이블 (콘텐츠 카테고리)
+CREATE TABLE content_categories (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  category_name VARCHAR(100) NOT NULL,
+  category_icon VARCHAR(255),
+  category_description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Content Tags 테이블 (콘텐츠 태그)
+CREATE TABLE content_tags (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  tag_name VARCHAR(100) NOT NULL,
+  tag_description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Contents 테이블 (AI로 만든 결과물)
+CREATE TABLE contents (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  content_title VARCHAR(200) NOT NULL,
+  content_description TEXT,
+  content_url VARCHAR(255),
+  content_type VARCHAR(20) NOT NULL, -- link, logo, image, video, text, audio, pdf, etc.
+  content_order_index INT DEFAULT 0,
+  content_status VARCHAR(20) DEFAULT 'active', -- active, inactive, pending, deleted
+  deleted_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
 
 -- Expert Contents 테이블 (전문가가 만든 콘텐츠)
 CREATE TABLE expert_contents (
@@ -122,10 +104,10 @@ CREATE TABLE expert_contents (
   content_id INT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (expert_id) REFERENCES experts(id) ON DELETE CASCADE,
-  FOREIGN KEY (content_id) REFERENCES contents(id) ON DELETE CASCADE,
+  FOREIGN KEY (expert_id) REFERENCES experts(id),
+  FOREIGN KEY (content_id) REFERENCES contents(id),
   UNIQUE KEY unique_expert_content (expert_id, content_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 -- Content Category Relations 테이블 (콘텐츠-카테고리 관계)
 CREATE TABLE content_category_relations (
@@ -134,10 +116,10 @@ CREATE TABLE content_category_relations (
   category_id INT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (content_id) REFERENCES contents(id) ON DELETE CASCADE,
-  FOREIGN KEY (category_id) REFERENCES content_categories(id) ON DELETE CASCADE,
+  FOREIGN KEY (content_id) REFERENCES contents(id),
+  FOREIGN KEY (category_id) REFERENCES content_categories(id),
   UNIQUE KEY unique_content_category (content_id, category_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 -- Content Tag Relations 테이블 (콘텐츠-태그 관계)
 CREATE TABLE content_tag_relations (
@@ -146,10 +128,10 @@ CREATE TABLE content_tag_relations (
   tag_id INT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (content_id) REFERENCES contents(id) ON DELETE CASCADE,
-  FOREIGN KEY (tag_id) REFERENCES content_tags(id) ON DELETE CASCADE,
+  FOREIGN KEY (content_id) REFERENCES contents(id),
+  FOREIGN KEY (tag_id) REFERENCES content_tags(id),
   UNIQUE KEY unique_content_tag (content_id, tag_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 -- Expert AI Services 테이블 (전문가가 사용하는 AI 서비스)
 CREATE TABLE expert_ai_services (
@@ -159,10 +141,10 @@ CREATE TABLE expert_ai_services (
   usage_description TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (expert_id) REFERENCES experts(id) ON DELETE CASCADE,
-  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
+  FOREIGN KEY (expert_id) REFERENCES experts(id),
+  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id),
   UNIQUE KEY unique_expert_ai_service (expert_id, ai_service_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 -- Content AI Services 테이블 (콘텐츠 제작에 사용된 AI 서비스)
 CREATE TABLE content_ai_services (
@@ -172,10 +154,10 @@ CREATE TABLE content_ai_services (
   usage_description TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (content_id) REFERENCES contents(id) ON DELETE CASCADE,
-  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
+  FOREIGN KEY (content_id) REFERENCES contents(id),
+  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id),
   UNIQUE KEY unique_content_ai_service (content_id, ai_service_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 -- Matching Requests 테이블 (매칭 요청)
 CREATE TABLE matching_requests (
@@ -184,68 +166,90 @@ CREATE TABLE matching_requests (
   expert_id INT NOT NULL,
   request_title VARCHAR(200) NOT NULL,
   request_description TEXT,
-  request_status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT 'pending, accepted, rejected, completed',
+  request_status VARCHAR(20) DEFAULT 'pending', -- pending, accepted, rejected, completed
   request_budget DECIMAL(10,2),
   request_deadline DATE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (client_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (expert_id) REFERENCES experts(id) ON DELETE CASCADE,
-  INDEX idx_request_status (request_status),
-  INDEX idx_request_deadline (request_deadline)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  FOREIGN KEY (client_id) REFERENCES users(id),
+  FOREIGN KEY (expert_id) REFERENCES experts(id)
+);
 
 -- Reviews 테이블 (리뷰)
 CREATE TABLE reviews (
   id INT AUTO_INCREMENT PRIMARY KEY,
   client_id INT NOT NULL,
   expert_id INT NOT NULL,
-  content_id INT,
+  content_id INT NOT NULL,
   rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
   review_text TEXT,
-  review_status VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT 'active, hidden, deleted',
+  review_status VARCHAR(20) DEFAULT 'active', -- active, hidden, deleted
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (client_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (expert_id) REFERENCES experts(id) ON DELETE CASCADE,
-  FOREIGN KEY (content_id) REFERENCES contents(id) ON DELETE SET NULL,
-  INDEX idx_rating (rating),
-  INDEX idx_review_status (review_status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  FOREIGN KEY (client_id) REFERENCES users(id),
+  FOREIGN KEY (expert_id) REFERENCES experts(id),
+  FOREIGN KEY (content_id) REFERENCES contents(id)
+);
 
--- 샘플 데이터 삽입
+-- Content Views 테이블 (콘텐츠 조회 기록)
+CREATE TABLE content_views (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  content_id INT NOT NULL,
+  user_id INT,
+  view_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  ip_address VARCHAR(45),
+  user_agent TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (content_id) REFERENCES contents(id),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
 
--- Groups 샘플 데이터
-INSERT INTO groups (group_name, group_description, group_status) VALUES
-('AI 전문가 그룹 A', 'AI 솔루션 전문 그룹', 'active'),
-('AI 전문가 그룹 B', 'AI 컨설팅 전문 그룹', 'active'),
-('AI 전문가 그룹 C', 'AI 개발 전문 그룹', 'active');
+-- Ranking Weights 테이블 (랭킹 가중치 설정)
+CREATE TABLE ranking_weights (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ranking_type VARCHAR(50) NOT NULL, -- ai_service, content, expert, category
+  weight_name VARCHAR(100) NOT NULL,
+  weight_value DECIMAL(5,3) NOT NULL,
+  weight_description TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_ranking_weight (ranking_type, weight_name)
+);
 
--- AI Services 샘플 데이터
-INSERT INTO ai_services (ai_name, ai_description, ai_type, nationality) VALUES
-('ChatGPT', 'OpenAI의 대화형 AI 모델', 'LLM', 'USA'),
-('Claude', 'Anthropic의 AI 어시스턴트', 'LLM', 'USA'),
-('Midjourney', 'AI 이미지 생성 서비스', 'Image Generation', 'USA'),
-('DALL-E', 'OpenAI의 AI 이미지 생성', 'Image Generation', 'USA'),
-('Stable Diffusion', '오픈소스 AI 이미지 생성', 'Image Generation', 'Germany');
+-- Rankings 테이블 (랭킹 결과 저장)
+CREATE TABLE rankings (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ranking_type VARCHAR(50) NOT NULL, -- ai_service, content, expert, category
+  entity_id INT NOT NULL,
+  entity_type VARCHAR(50) NOT NULL, -- ai_service_id, content_id, expert_id, category_id
+  total_score DECIMAL(10,3) NOT NULL,
+  view_count INT DEFAULT 0,
+  request_count INT DEFAULT 0,
+  avg_rating DECIMAL(3,2) DEFAULT 0.00,
+  ranking_date DATE NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_ranking (ranking_type, entity_id, ranking_date)
+);
 
--- Content Categories 샘플 데이터
-INSERT INTO content_categories (category_name, category_description) VALUES
-('웹사이트', '웹사이트 관련 콘텐츠'),
-('모바일 앱', '모바일 애플리케이션 관련 콘텐츠'),
-('마케팅', '마케팅 관련 콘텐츠'),
-('디자인', '디자인 관련 콘텐츠'),
-('개발', '개발 관련 콘텐츠');
+-- 기본 랭킹 가중치 데이터 삽입
+INSERT INTO ranking_weights (ranking_type, weight_name, weight_value, weight_description) VALUES
+-- AI 서비스 랭킹 가중치
+('ai_service', 'view_weight', 0.300, '조회수 가중치'),
+('ai_service', 'request_weight', 0.400, '매칭 요청수 가중치'),
+('ai_service', 'rating_weight', 0.300, '평점 가중치'),
 
--- Content Tags 샘플 데이터
-INSERT INTO content_tags (tag_name, tag_description) VALUES
-('React', 'React 프레임워크'),
-('Vue', 'Vue.js 프레임워크'),
-('Node.js', 'Node.js 런타임'),
-('Python', 'Python 프로그래밍 언어'),
-('JavaScript', 'JavaScript 프로그래밍 언어'),
-('UI/UX', '사용자 인터페이스/경험'),
-('반응형', '반응형 디자인'),
-('SEO', '검색엔진 최적화'),
-('SNS', '소셜미디어'),
-('브랜딩', '브랜드 디자인'); 
+-- 콘텐츠 랭킹 가중치
+('content', 'view_weight', 0.500, '조회수 가중치'),
+('content', 'rating_weight', 0.500, '평점 가중치'),
+
+-- 전문가 랭킹 가중치
+('expert', 'content_count_weight', 0.250, '콘텐츠 수 가중치'),
+('expert', 'request_weight', 0.350, '매칭 요청수 가중치'),
+('expert', 'rating_weight', 0.400, '평점 가중치'),
+
+-- 카테고리 랭킹 가중치
+('category', 'content_count_weight', 0.400, '콘텐츠 수 가중치'),
+('category', 'view_weight', 0.300, '조회수 가중치'),
+('category', 'rating_weight', 0.300, '평점 가중치'); 
