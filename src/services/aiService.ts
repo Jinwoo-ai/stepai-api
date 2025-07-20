@@ -1,255 +1,197 @@
 import { getDatabaseConnection } from '../configs/database';
-import { AIService, ApiResponse, PaginationParams, PaginatedResponse, AIServiceFilters, AIServiceDetail, AIServiceListOptions, AIServiceWithRelations, AIServiceCreateRequest } from '../types/database';
-import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { AIService, ApiResponse, PaginationParams, PaginatedResponse, AIServiceFilters, AIServiceCreateRequest } from '../types/database';
 
-export class AIServiceService {
-  private db = getDatabaseConnection();
+class AIServiceService {
+  private pool = getDatabaseConnection();
 
   // AI 서비스 생성
   async createAIService(serviceData: AIServiceCreateRequest): Promise<ApiResponse<AIService>> {
     try {
-      // 트랜잭션 시작
-      const connection = await this.db.getConnection();
-      await connection.beginTransaction();
-
+      const connection = await this.pool.getConnection();
+      
       try {
-        // AI 서비스 기본 정보 생성
-        const [result] = await connection.execute<ResultSetHeader>(
-          'INSERT INTO ai_services (ai_name, ai_description, ai_type, ai_status, nationality) VALUES (?, ?, ?, ?, ?)',
-          [serviceData.ai_name, serviceData.ai_description, serviceData.ai_type, serviceData.ai_status || 'active', serviceData.nationality]
+        // AI 서비스 생성
+        const [result] = await connection.execute(
+          `INSERT INTO ai_services (ai_name, ai_description, ai_type, nationality) 
+           VALUES (?, ?, ?, ?)`,
+          [
+            serviceData.ai_name,
+            serviceData.ai_description,
+            serviceData.ai_type,
+            serviceData.nationality
+          ]
         );
 
-        const newServiceId = result.insertId;
+        const serviceId = (result as any).insertId;
 
-        // 카테고리 연결 처리
-        if (serviceData.category_ids && serviceData.category_ids.length > 0) {
-          for (const categoryId of serviceData.category_ids) {
-            await connection.execute(
-              'INSERT INTO ai_service_categories (ai_service_id, category_id) VALUES (?, ?)',
-              [newServiceId, categoryId]
-            );
-          }
-        }
+        // 생성된 AI 서비스 조회
+        const [services] = await connection.execute(
+          'SELECT * FROM ai_services WHERE id = ?',
+          [serviceId]
+        );
 
-        // 트랜잭션 커밋
-        await connection.commit();
-        connection.release();
+        const service = (services as any[])[0];
 
-        const newService = { ...serviceData, id: newServiceId };
         return {
           success: true,
-          data: newService,
+          data: service,
           message: 'AI 서비스가 성공적으로 생성되었습니다.'
         };
-      } catch (error) {
-        // 트랜잭션 롤백
-        await connection.rollback();
+      } finally {
         connection.release();
-        throw error;
       }
     } catch (error) {
+      console.error('AI 서비스 생성 오류:', error);
       return {
         success: false,
-        error: `AI 서비스 생성 실패: ${error instanceof Error ? error.message : 'Unknown error'}`
+        error: 'AI 서비스 생성 중 오류가 발생했습니다.'
       };
     }
   }
 
-  // AI 서비스 조회 (ID로)
+  // ID로 AI 서비스 조회
   async getAIServiceById(id: number): Promise<ApiResponse<AIService>> {
     try {
-      const [rows] = await this.db.execute<RowDataPacket[]>(
-        'SELECT * FROM ai_services WHERE id = ? AND deleted_at IS NULL',
-        [id]
-      );
+      const connection = await this.pool.getConnection();
+      
+      try {
+        const [services] = await connection.execute(
+          'SELECT * FROM ai_services WHERE id = ? AND deleted_at IS NULL',
+          [id]
+        );
 
-      if (rows.length === 0) {
+        if ((services as any[]).length === 0) {
+          return {
+            success: false,
+            error: 'AI 서비스를 찾을 수 없습니다.'
+          };
+        }
+
         return {
-          success: false,
-          error: 'AI 서비스를 찾을 수 없습니다.'
+          success: true,
+          data: (services as any[])[0]
         };
+      } finally {
+        connection.release();
       }
-
-      return {
-        success: true,
-        data: rows[0] as AIService
-      };
     } catch (error) {
+      console.error('AI 서비스 조회 오류:', error);
       return {
         success: false,
-        error: `AI 서비스 조회 실패: ${error instanceof Error ? error.message : 'Unknown error'}`
+        error: 'AI 서비스 조회 중 오류가 발생했습니다.'
       };
     }
   }
 
   // AI 서비스 상세 조회 (관련 데이터 포함)
-  async getAIServiceDetailById(id: number): Promise<ApiResponse<AIServiceDetail>> {
+  async getAIServiceDetailById(id: number): Promise<ApiResponse<any>> {
     try {
-      // 기본 AI 서비스 정보 조회
-      const [serviceRows] = await this.db.execute<RowDataPacket[]>(
-        'SELECT * FROM ai_services WHERE id = ? AND deleted_at IS NULL',
-        [id]
-      );
+      const connection = await this.pool.getConnection();
+      
+      try {
+        // AI 서비스 기본 정보 조회
+        const [services] = await connection.execute(
+          'SELECT * FROM ai_services WHERE id = ? AND deleted_at IS NULL',
+          [id]
+        );
 
-      if (serviceRows.length === 0) {
-        return {
-          success: false,
-          error: 'AI 서비스를 찾을 수 없습니다.'
+        if ((services as any[]).length === 0) {
+          return {
+            success: false,
+            error: 'AI 서비스를 찾을 수 없습니다.'
+          };
+        }
+
+        const service = (services as any[])[0];
+
+        // AI 서비스를 사용하는 전문가 조회
+        const [experts] = await connection.execute(
+          `SELECT e.* FROM experts e 
+           INNER JOIN expert_ai_services eas ON e.id = eas.expert_id 
+           WHERE eas.ai_service_id = ? AND e.deleted_at IS NULL`,
+          [id]
+        );
+
+        // AI 서비스로 만든 콘텐츠 조회
+        const [contents] = await connection.execute(
+          `SELECT c.* FROM contents c 
+           INNER JOIN content_ai_services cas ON c.id = cas.content_id 
+           WHERE cas.ai_service_id = ? AND c.deleted_at IS NULL`,
+          [id]
+        );
+
+        const serviceDetail = {
+          ...service,
+          experts: experts as any[],
+          contents: contents as any[]
         };
+
+        return {
+          success: true,
+          data: serviceDetail
+        };
+      } finally {
+        connection.release();
       }
-
-      const service = serviceRows[0] as AIService;
-
-      // 관련 콘텐츠 조회
-      const [contentRows] = await this.db.execute<RowDataPacket[]>(
-        'SELECT * FROM ai_service_contents WHERE ai_service_id = ? ORDER BY content_order_index ASC',
-        [id]
-      );
-
-      // 관련 태그 조회
-      const [tagRows] = await this.db.execute<RowDataPacket[]>(
-        'SELECT * FROM ai_service_tags WHERE ai_service_id = ? ORDER BY tag_name ASC',
-        [id]
-      );
-
-      // 관련 카테고리 조회
-      const [categoryRows] = await this.db.execute<RowDataPacket[]>(
-        `SELECT ac.* FROM ai_categories ac
-         INNER JOIN ai_service_categories aisc ON ac.id = aisc.category_id
-         WHERE aisc.ai_service_id = ?`,
-        [id]
-      );
-
-      // 관련 회사 조회
-      const [companyRows] = await this.db.execute<RowDataPacket[]>(
-        `SELECT c.* FROM company c
-         INNER JOIN company_ai_services cas ON c.id = cas.company_id
-         WHERE cas.ai_service_id = ? AND c.deleted_at IS NULL`,
-        [id]
-      );
-
-      const serviceDetail: AIServiceDetail = {
-        ...service,
-        contents: contentRows as any[],
-        tags: tagRows as any[],
-        categories: categoryRows as any[],
-        companies: companyRows as any[]
-      };
-
-      return {
-        success: true,
-        data: serviceDetail
-      };
     } catch (error) {
+      console.error('AI 서비스 상세 조회 오류:', error);
       return {
         success: false,
-        error: `AI 서비스 상세 조회 실패: ${error instanceof Error ? error.message : 'Unknown error'}`
+        error: 'AI 서비스 상세 조회 중 오류가 발생했습니다.'
       };
     }
   }
 
-  // AI 서비스 목록 조회 (페이지네이션)
-  async getAIServices(params: PaginationParams, filters?: AIServiceFilters, options?: AIServiceListOptions): Promise<ApiResponse<PaginatedResponse<AIServiceWithRelations>>> {
+  // AI 서비스 목록 조회
+  async getAIServices(params: PaginationParams, filters: AIServiceFilters = {}): Promise<ApiResponse<PaginatedResponse<AIService>>> {
     try {
-      const { page, limit } = params;
-      const offset = (page - 1) * limit;
+      const connection = await this.pool.getConnection();
+      
+      try {
+        const { page, limit } = params;
+        const offset = (page - 1) * limit;
 
-      let whereClause = 'WHERE deleted_at IS NULL';
-      const queryParams: any[] = [];
+        // WHERE 조건 구성
+        const whereConditions: string[] = ['deleted_at IS NULL'];
+        const queryParams: any[] = [];
 
-      if (filters?.ai_status) {
-        whereClause += ' AND ai_status = ?';
-        queryParams.push(filters.ai_status);
-      }
-
-      if (filters?.ai_type) {
-        whereClause += ' AND ai_type = ?';
-        queryParams.push(filters.ai_type);
-      }
-
-      if (filters?.nationality) {
-        whereClause += ' AND nationality = ?';
-        queryParams.push(filters.nationality);
-      }
-
-      if (filters?.category_id) {
-        whereClause += ` AND id IN (
-          SELECT ai_service_id FROM ai_service_categories WHERE category_id = ?
-        )`;
-        queryParams.push(filters.category_id);
-      }
-
-      // 전체 개수 조회
-      const [countRows] = await this.db.execute<RowDataPacket[]>(
-        `SELECT COUNT(*) as total FROM ai_services ${whereClause}`,
-        queryParams
-      );
-      const total = countRows[0]?.['total'] as number || 0;
-
-      // 데이터 조회
-      const [rows] = await this.db.execute<RowDataPacket[]>(
-        `SELECT * FROM ai_services ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-        [...queryParams, limit, offset]
-      );
-
-      const services = rows as AIService[];
-
-      // 관련 데이터 포함 옵션이 있는 경우
-      if (options && (options.include_contents || options.include_tags || options.include_categories || options.include_companies)) {
-        const servicesWithRelations: AIServiceWithRelations[] = [];
-
-        for (const service of services) {
-          const serviceWithRelations: AIServiceWithRelations = { ...service };
-
-          // 콘텐츠 포함
-          if (options.include_contents) {
-            const [contentRows] = await this.db.execute<RowDataPacket[]>(
-              'SELECT * FROM ai_service_contents WHERE ai_service_id = ? ORDER BY content_order_index ASC',
-              [service.id]
-            );
-            serviceWithRelations.contents = contentRows as any[];
-          }
-
-          // 태그 포함
-          if (options.include_tags) {
-            const [tagRows] = await this.db.execute<RowDataPacket[]>(
-              'SELECT * FROM ai_service_tags WHERE ai_service_id = ? ORDER BY tag_name ASC',
-              [service.id]
-            );
-            serviceWithRelations.tags = tagRows as any[];
-          }
-
-          // 카테고리 포함
-          if (options.include_categories) {
-            const [categoryRows] = await this.db.execute<RowDataPacket[]>(
-              `SELECT ac.* FROM ai_categories ac
-               INNER JOIN ai_service_categories aisc ON ac.id = aisc.category_id
-               WHERE aisc.ai_service_id = ?`,
-              [service.id]
-            );
-            serviceWithRelations.categories = categoryRows as any[];
-          }
-
-          // 회사 포함
-          if (options.include_companies) {
-            const [companyRows] = await this.db.execute<RowDataPacket[]>(
-              `SELECT c.* FROM company c
-               INNER JOIN company_ai_services cas ON c.id = cas.company_id
-               WHERE cas.ai_service_id = ? AND c.deleted_at IS NULL`,
-              [service.id]
-            );
-            serviceWithRelations.companies = companyRows as any[];
-          }
-
-          servicesWithRelations.push(serviceWithRelations);
+        if (filters.ai_status) {
+          whereConditions.push('ai_status = ?');
+          queryParams.push(filters.ai_status);
         }
 
+        if (filters.ai_type) {
+          whereConditions.push('ai_type = ?');
+          queryParams.push(filters.ai_type);
+        }
+
+        if (filters.nationality) {
+          whereConditions.push('nationality = ?');
+          queryParams.push(filters.nationality);
+        }
+
+        const whereClause = whereConditions.join(' AND ');
+
+        // 전체 개수 조회
+        const [countResult] = await connection.execute(
+          `SELECT COUNT(*) as total FROM ai_services WHERE ${whereClause}`,
+          queryParams
+        );
+
+        const total = (countResult as any[])[0].total;
         const totalPages = Math.ceil(total / limit);
+
+        // AI 서비스 목록 조회
+        const [services] = await connection.execute(
+          `SELECT * FROM ai_services WHERE ${whereClause} 
+           ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+          [...queryParams, limit, offset]
+        );
 
         return {
           success: true,
           data: {
-            data: servicesWithRelations,
+            data: services as AIService[],
             pagination: {
               page,
               limit,
@@ -258,27 +200,14 @@ export class AIServiceService {
             }
           }
         };
+      } finally {
+        connection.release();
       }
-
-      // 관련 데이터 포함 옵션이 없는 경우 기존 방식
-      const totalPages = Math.ceil(total / limit);
-
-      return {
-        success: true,
-        data: {
-          data: services as AIServiceWithRelations[],
-          pagination: {
-            page,
-            limit,
-            total,
-            totalPages
-          }
-        }
-      };
     } catch (error) {
+      console.error('AI 서비스 목록 조회 오류:', error);
       return {
         success: false,
-        error: `AI 서비스 목록 조회 실패: ${error instanceof Error ? error.message : 'Unknown error'}`
+        error: 'AI 서비스 목록 조회 중 오류가 발생했습니다.'
       };
     }
   }
@@ -286,104 +215,124 @@ export class AIServiceService {
   // AI 서비스 정보 수정
   async updateAIService(id: number, serviceData: Partial<AIService>): Promise<ApiResponse<AIService>> {
     try {
-      const updateFields: string[] = [];
-      const updateValues: any[] = [];
+      const connection = await this.pool.getConnection();
+      
+      try {
+        // AI 서비스 존재 확인
+        const [existingServices] = await connection.execute(
+          'SELECT id FROM ai_services WHERE id = ? AND deleted_at IS NULL',
+          [id]
+        );
 
-      if (serviceData.ai_name !== undefined) {
-        updateFields.push('ai_name = ?');
-        updateValues.push(serviceData.ai_name);
-      }
-      if (serviceData.ai_description !== undefined) {
-        updateFields.push('ai_description = ?');
-        updateValues.push(serviceData.ai_description);
-      }
-      if (serviceData.ai_type !== undefined) {
-        updateFields.push('ai_type = ?');
-        updateValues.push(serviceData.ai_type);
-      }
-      if (serviceData.ai_status !== undefined) {
-        updateFields.push('ai_status = ?');
-        updateValues.push(serviceData.ai_status);
-      }
-      if (serviceData.nationality !== undefined) {
-        updateFields.push('nationality = ?');
-        updateValues.push(serviceData.nationality);
-      }
+        if ((existingServices as any[]).length === 0) {
+          return {
+            success: false,
+            error: 'AI 서비스를 찾을 수 없습니다.'
+          };
+        }
 
-      if (updateFields.length === 0) {
+        // 업데이트할 필드 구성
+        const updateFields: string[] = [];
+        const updateParams: any[] = [];
+
+        if (serviceData.ai_name) {
+          updateFields.push('ai_name = ?');
+          updateParams.push(serviceData.ai_name);
+        }
+
+        if (serviceData.ai_description !== undefined) {
+          updateFields.push('ai_description = ?');
+          updateParams.push(serviceData.ai_description);
+        }
+
+        if (serviceData.ai_type) {
+          updateFields.push('ai_type = ?');
+          updateParams.push(serviceData.ai_type);
+        }
+
+        if (serviceData.ai_status) {
+          updateFields.push('ai_status = ?');
+          updateParams.push(serviceData.ai_status);
+        }
+
+        if (serviceData.nationality !== undefined) {
+          updateFields.push('nationality = ?');
+          updateParams.push(serviceData.nationality);
+        }
+
+        if (updateFields.length === 0) {
+          return {
+            success: false,
+            error: '수정할 데이터가 없습니다.'
+          };
+        }
+
+        // AI 서비스 정보 업데이트
+        await connection.execute(
+          `UPDATE ai_services SET ${updateFields.join(', ')} WHERE id = ?`,
+          [...updateParams, id]
+        );
+
+        // 업데이트된 AI 서비스 조회
+        const [services] = await connection.execute(
+          'SELECT * FROM ai_services WHERE id = ?',
+          [id]
+        );
+
         return {
-          success: false,
-          error: '수정할 데이터가 없습니다.'
+          success: true,
+          data: (services as any[])[0],
+          message: 'AI 서비스 정보가 성공적으로 수정되었습니다.'
         };
+      } finally {
+        connection.release();
       }
-
-      updateValues.push(id);
-
-      const [result] = await this.db.execute<ResultSetHeader>(
-        `UPDATE ai_services SET ${updateFields.join(', ')} WHERE id = ? AND deleted_at IS NULL`,
-        updateValues
-      );
-
-      if (result.affectedRows === 0) {
-        return {
-          success: false,
-          error: 'AI 서비스를 찾을 수 없습니다.'
-        };
-      }
-
-      // 수정된 AI 서비스 정보 조회
-      const getServiceResult = await this.getAIServiceById(id);
-      return getServiceResult;
     } catch (error) {
+      console.error('AI 서비스 수정 오류:', error);
       return {
         success: false,
-        error: `AI 서비스 수정 실패: ${error instanceof Error ? error.message : 'Unknown error'}`
+        error: 'AI 서비스 수정 중 오류가 발생했습니다.'
       };
     }
   }
 
   // AI 서비스 삭제 (소프트 삭제)
-  async deleteAIService(id: number): Promise<ApiResponse<null>> {
+  async deleteAIService(id: number): Promise<ApiResponse<void>> {
     try {
-      const [result] = await this.db.execute<ResultSetHeader>(
-        'UPDATE ai_services SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL',
-        [id]
-      );
+      const connection = await this.pool.getConnection();
+      
+      try {
+        // AI 서비스 존재 확인
+        const [existingServices] = await connection.execute(
+          'SELECT id FROM ai_services WHERE id = ? AND deleted_at IS NULL',
+          [id]
+        );
 
-      if (result.affectedRows === 0) {
+        if ((existingServices as any[]).length === 0) {
+          return {
+            success: false,
+            error: 'AI 서비스를 찾을 수 없습니다.'
+          };
+        }
+
+        // 소프트 삭제
+        await connection.execute(
+          'UPDATE ai_services SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?',
+          [id]
+        );
+
         return {
-          success: false,
-          error: 'AI 서비스를 찾을 수 없습니다.'
+          success: true,
+          message: 'AI 서비스가 성공적으로 삭제되었습니다.'
         };
+      } finally {
+        connection.release();
       }
-
-      return {
-        success: true,
-        message: 'AI 서비스가 성공적으로 삭제되었습니다.'
-      };
     } catch (error) {
+      console.error('AI 서비스 삭제 오류:', error);
       return {
         success: false,
-        error: `AI 서비스 삭제 실패: ${error instanceof Error ? error.message : 'Unknown error'}`
-      };
-    }
-  }
-
-  // AI 서비스 타입별 통계
-  async getAIServiceStats(): Promise<ApiResponse<any>> {
-    try {
-      const [rows] = await this.db.execute<RowDataPacket[]>(
-        'SELECT ai_type, COUNT(*) as count FROM ai_services WHERE deleted_at IS NULL GROUP BY ai_type'
-      );
-
-      return {
-        success: true,
-        data: rows
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: `AI 서비스 통계 조회 실패: ${error instanceof Error ? error.message : 'Unknown error'}`
+        error: 'AI 서비스 삭제 중 오류가 발생했습니다.'
       };
     }
   }
@@ -391,22 +340,94 @@ export class AIServiceService {
   // AI 서비스 검색
   async searchAIServices(searchTerm: string): Promise<ApiResponse<AIService[]>> {
     try {
-      const [rows] = await this.db.execute<RowDataPacket[]>(
-        `SELECT * FROM ai_services 
-         WHERE (ai_name LIKE ? OR ai_description LIKE ?) 
-         AND deleted_at IS NULL 
-         ORDER BY created_at DESC`,
-        [`%${searchTerm}%`, `%${searchTerm}%`]
-      );
+      const connection = await this.pool.getConnection();
+      
+      try {
+        const [services] = await connection.execute(
+          `SELECT * FROM ai_services 
+           WHERE (ai_name LIKE ? OR ai_description LIKE ? OR ai_type LIKE ?) 
+           AND deleted_at IS NULL 
+           ORDER BY created_at DESC`,
+          [`%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`]
+        );
 
-      return {
-        success: true,
-        data: rows as AIService[]
-      };
+        return {
+          success: true,
+          data: services as AIService[]
+        };
+      } finally {
+        connection.release();
+      }
     } catch (error) {
+      console.error('AI 서비스 검색 오류:', error);
       return {
         success: false,
-        error: `AI 서비스 검색 실패: ${error instanceof Error ? error.message : 'Unknown error'}`
+        error: 'AI 서비스 검색 중 오류가 발생했습니다.'
+      };
+    }
+  }
+
+  // AI 서비스 통계 조회
+  async getAIServiceStats(): Promise<ApiResponse<any>> {
+    try {
+      const connection = await this.pool.getConnection();
+      
+      try {
+        // 전체 AI 서비스 수
+        const [totalResult] = await connection.execute(
+          'SELECT COUNT(*) as total FROM ai_services WHERE deleted_at IS NULL'
+        );
+
+        // AI 서비스 상태별 통계
+        const [statusStats] = await connection.execute(
+          `SELECT ai_status, COUNT(*) as count 
+           FROM ai_services WHERE deleted_at IS NULL 
+           GROUP BY ai_status`
+        );
+
+        // AI 서비스 타입별 통계
+        const [typeStats] = await connection.execute(
+          `SELECT ai_type, COUNT(*) as count 
+           FROM ai_services WHERE deleted_at IS NULL 
+           GROUP BY ai_type 
+           ORDER BY count DESC`
+        );
+
+        // 국가별 AI 서비스 수
+        const [nationalityStats] = await connection.execute(
+          `SELECT nationality, COUNT(*) as count 
+           FROM ai_services WHERE deleted_at IS NULL AND nationality IS NOT NULL 
+           GROUP BY nationality 
+           ORDER BY count DESC 
+           LIMIT 10`
+        );
+
+        // 최근 생성된 AI 서비스 수 (최근 30일)
+        const [recentResult] = await connection.execute(
+          `SELECT COUNT(*) as recent 
+           FROM ai_services 
+           WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) 
+           AND deleted_at IS NULL`
+        );
+
+        return {
+          success: true,
+          data: {
+            total: (totalResult as any[])[0].total,
+            statusStats: statusStats as any[],
+            typeStats: typeStats as any[],
+            nationalityStats: nationalityStats as any[],
+            recentServices: (recentResult as any[])[0].recent
+          }
+        };
+      } finally {
+        connection.release();
+      }
+    } catch (error) {
+      console.error('AI 서비스 통계 조회 오류:', error);
+      return {
+        success: false,
+        error: 'AI 서비스 통계 조회 중 오류가 발생했습니다.'
       };
     }
   }

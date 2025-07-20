@@ -1,58 +1,57 @@
-# StepAI API Database Schema
+# StepAI API Database Schema - AI 전문가 매칭 서비스
 
-# Users 테이블
+# Users 테이블 (일반 사용자)
 users: {
   shape: sql_table
   id: int {constraint: primary_key}
   username: varchar(50) 
   email: varchar(100) {constraint: unique}
   password_hash: varchar(255)
+  user_type: varchar(20) # client, expert, admin
   user_status: varchar(20) # active, inactive, pending, deleted
   deleted_at: timestamp
   created_at: timestamp
   updated_at: timestamp
 }
 
-# company 테이블 
-company: {
+# Groups 테이블 (전문가 그룹)
+groups: {
   shape: sql_table
   id: int {constraint: primary_key}
-  company_name: varchar(100) {constraint: unique}
-  company_registration_number: varchar(20) {constraint: unique}
-  company_description: text
-  company_logo: varchar(255)
-  company_website: varchar(255)
-  company_email: varchar(100) {constraint: unique}
-  company_phone: varchar(20)
-  company_address: varchar(255)
-  company_status: varchar(20) # active, inactive, pending, deleted
+  group_name: varchar(100)
+  group_description: text
+  group_logo: varchar(255)
+  group_website: varchar(255)
+  group_email: varchar(100)
+  group_phone: varchar(20)
+  group_address: varchar(255)
+  group_status: varchar(20) # active, inactive, pending, deleted
   deleted_at: timestamp
   created_at: timestamp
   updated_at: timestamp
 }
 
-# user_company 테이블
-user_company: {
+# Experts 테이블 (AI 전문가)
+experts: {
   shape: sql_table
   id: int {constraint: primary_key}
   user_id: int {constraint: foreign_key}
-  company_id: int {constraint: foreign_key}
-  role: varchar(20) # ceo, manager, employee
+  group_id: int {constraint: foreign_key}
+  expert_name: varchar(100)
+  expert_title: varchar(100)
+  expert_bio: text
+  expert_avatar: varchar(255)
+  expert_website: varchar(255)
+  expert_email: varchar(100)
+  expert_phone: varchar(20)
+  expert_location: varchar(255)
+  expert_status: varchar(20) # active, inactive, pending, deleted
+  deleted_at: timestamp
   created_at: timestamp
   updated_at: timestamp
 }
 
-# company_ai_services 테이블
-company_ai_services: {
-  shape: sql_table
-  id: int {constraint: primary_key}
-  company_id: int {constraint: foreign_key}
-  ai_service_id: int {constraint: foreign_key}
-  created_at: timestamp
-  updated_at: timestamp
-}
-
-# ai services 테이블
+# AI Services 테이블 (AI 서비스)
 ai_services: {
   shape: sql_table
   id: int {constraint: primary_key}
@@ -66,57 +65,138 @@ ai_services: {
   updated_at: timestamp
 }
 
-# ai_service_contents 테이블
-ai_service_contents: {
+# Contents 테이블 (AI로 만든 결과물)
+contents: {
   shape: sql_table
   id: int {constraint: primary_key}
-  ai_service_id: int {constraint: foreign_key}
   content_title: varchar(200)
+  content_description: text
   content_url: varchar(255)
   content_type: varchar(20) # link, logo, image, video, text, audio, pdf, etc.
-  content_description: text
   content_order_index: int
+  content_status: varchar(20) # active, inactive, pending, deleted
+  deleted_at: timestamp
   created_at: timestamp
   updated_at: timestamp
 }
 
-# ai_service_tags 테이블
-ai_service_tags: {
-  shape: sql_table
-  id: int {constraint: primary_key}
-  ai_service_id: int {constraint: foreign_key}
-  tag_name: varchar(100)
-  created_at: timestamp
-  updated_at: timestamp
-}
-
-# ai_categories 테이블
-ai_categories: {
+# Content Categories 테이블 (콘텐츠 카테고리)
+content_categories: {
   shape: sql_table
   id: int {constraint: primary_key}
   category_name: varchar(100)
   category_icon: varchar(255)
+  category_description: text
   created_at: timestamp
   updated_at: timestamp
 }
 
-# ai_service_categories 테이블
-ai_service_categories: {
+# Content Tags 테이블 (콘텐츠 태그)
+content_tags: {
   shape: sql_table
   id: int {constraint: primary_key}
-  ai_service_id: int {constraint: foreign_key}
+  tag_name: varchar(100)
+  tag_description: text
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# Expert Contents 테이블 (전문가가 만든 콘텐츠)
+expert_contents: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  expert_id: int {constraint: foreign_key}
+  content_id: int {constraint: foreign_key}
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# Content Category Relations 테이블 (콘텐츠-카테고리 관계)
+content_category_relations: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  content_id: int {constraint: foreign_key}
   category_id: int {constraint: foreign_key}
   created_at: timestamp
   updated_at: timestamp
 }
 
+# Content Tag Relations 테이블 (콘텐츠-태그 관계)
+content_tag_relations: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  content_id: int {constraint: foreign_key}
+  tag_id: int {constraint: foreign_key}
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# Expert AI Services 테이블 (전문가가 사용하는 AI 서비스)
+expert_ai_services: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  expert_id: int {constraint: foreign_key}
+  ai_service_id: int {constraint: foreign_key}
+  usage_description: text
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# Content AI Services 테이블 (콘텐츠 제작에 사용된 AI 서비스)
+content_ai_services: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  content_id: int {constraint: foreign_key}
+  ai_service_id: int {constraint: foreign_key}
+  usage_description: text
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# Matching Requests 테이블 (매칭 요청)
+matching_requests: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  client_id: int {constraint: foreign_key}
+  expert_id: int {constraint: foreign_key}
+  request_title: varchar(200)
+  request_description: text
+  request_status: varchar(20) # pending, accepted, rejected, completed
+  request_budget: decimal(10,2)
+  request_deadline: date
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# Reviews 테이블 (리뷰)
+reviews: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  client_id: int {constraint: foreign_key}
+  expert_id: int {constraint: foreign_key}
+  content_id: int {constraint: foreign_key}
+  rating: int
+  review_text: text
+  review_status: varchar(20) # active, hidden, deleted
+  created_at: timestamp
+  updated_at: timestamp
+}
 
 # 관계 정의
-ai_services -> ai_service_contents
-ai_services -> ai_service_tags
-ai_services -> ai_service_categories
-ai_categories -> ai_service_categories
-users -> user_company
-company -> user_company
-company -> company_ai_services
-ai_services -> company_ai_services
+users -> experts
+groups -> experts
+experts -> expert_contents
+contents -> expert_contents
+contents -> content_category_relations
+content_categories -> content_category_relations
+contents -> content_tag_relations
+content_tags -> content_tag_relations
+experts -> expert_ai_services
+ai_services -> expert_ai_services
+contents -> content_ai_services
+ai_services -> content_ai_services
+users -> matching_requests
+experts -> matching_requests
+users -> reviews
+experts -> reviews
+contents -> reviews

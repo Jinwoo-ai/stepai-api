@@ -1,22 +1,22 @@
 import express from 'express';
-import userService from '../services/userService';
-import { UserCreateRequest, UserUpdateRequest, UserFilters, PaginationParams } from '../types/database';
+import expertService from '../services/expertService';
+import { ExpertCreateRequest, ExpertUpdateRequest, ExpertFilters, ExpertListOptions, PaginationParams } from '../types/database';
 
 const router = express.Router();
 
 /**
  * @swagger
  * tags:
- *   name: Users
- *   description: 사용자 관리 API
+ *   name: Experts
+ *   description: AI 전문가 관리 API
  */
 
 /**
  * @swagger
- * /api/users:
+ * /api/experts:
  *   post:
- *     summary: 사용자 생성
- *     tags: [Users]
+ *     summary: 전문가 생성
+ *     tags: [Experts]
  *     requestBody:
  *       required: true
  *       content:
@@ -24,26 +24,42 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             properties:
- *               username:
+ *               user_id:
+ *                 type: integer
+ *                 description: 사용자 ID
+ *               group_id:
+ *                 type: integer
+ *                 description: 그룹 ID (선택사항)
+ *               expert_name:
  *                 type: string
- *                 description: 사용자명
- *               email:
+ *                 description: 전문가명
+ *               expert_title:
  *                 type: string
- *                 description: 이메일
- *               password:
+ *                 description: 전문가 직함
+ *               expert_bio:
  *                 type: string
- *                 description: 비밀번호
- *               user_type:
+ *                 description: 전문가 소개
+ *               expert_avatar:
  *                 type: string
- *                 enum: [client, expert, admin]
- *                 description: 사용자 타입
+ *                 description: 전문가 프로필 이미지 URL
+ *               expert_website:
+ *                 type: string
+ *                 description: 전문가 웹사이트
+ *               expert_email:
+ *                 type: string
+ *                 description: 전문가 이메일
+ *               expert_phone:
+ *                 type: string
+ *                 description: 전문가 전화번호
+ *               expert_location:
+ *                 type: string
+ *                 description: 전문가 위치
  *             required:
- *               - username
- *               - email
- *               - password
+ *               - user_id
+ *               - expert_name
  *     responses:
  *       201:
- *         description: 사용자가 성공적으로 생성됨
+ *         description: 전문가가 성공적으로 생성됨
  *         content:
  *           application/json:
  *             schema:
@@ -63,17 +79,17 @@ const router = express.Router();
  */
 router.post('/', async (req, res) => {
   try {
-    const userData: UserCreateRequest = req.body;
+    const expertData: ExpertCreateRequest = req.body;
     
     // 필수 필드 검증
-    if (!userData.username || !userData.email || !userData.password) {
+    if (!expertData.user_id || !expertData.expert_name) {
       return res.status(400).json({
         success: false,
-        error: '사용자명, 이메일, 비밀번호는 필수입니다.'
+        error: '사용자 ID와 전문가명은 필수입니다.'
       });
     }
 
-    const result = await userService.createUser(userData);
+    const result = await expertService.createExpert(expertData);
     
     if (result.success) {
       return res.status(201).json(result);
@@ -90,20 +106,20 @@ router.post('/', async (req, res) => {
 
 /**
  * @swagger
- * /api/users/{id}:
+ * /api/experts/{id}:
  *   get:
- *     summary: ID로 사용자 조회
- *     tags: [Users]
+ *     summary: ID로 전문가 조회
+ *     tags: [Experts]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: integer
- *         description: 사용자 ID
+ *         description: 전문가 ID
  *     responses:
  *       200:
- *         description: 사용자 정보 조회 성공
+ *         description: 전문가 정보 조회 성공
  *         content:
  *           application/json:
  *             schema:
@@ -115,7 +131,7 @@ router.post('/', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/ApiResponse'
  *       404:
- *         description: 사용자를 찾을 수 없음
+ *         description: 전문가를 찾을 수 없음
  *         content:
  *           application/json:
  *             schema:
@@ -138,7 +154,7 @@ router.get('/:id', async (req, res) => {
       });
     }
 
-    const result = await userService.getUserById(id);
+    const result = await expertService.getExpertById(id);
     
     if (result.success) {
       return res.json(result);
@@ -155,10 +171,75 @@ router.get('/:id', async (req, res) => {
 
 /**
  * @swagger
- * /api/users:
+ * /api/experts/{id}/detail:
  *   get:
- *     summary: 사용자 목록 조회
- *     tags: [Users]
+ *     summary: 전문가 상세 조회 (관련 데이터 포함)
+ *     tags: [Experts]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 전문가 ID
+ *     responses:
+ *       200:
+ *         description: 전문가 상세 정보 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
+ *       400:
+ *         description: 잘못된 요청
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
+ *       404:
+ *         description: 전문가를 찾을 수 없음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
+ *       500:
+ *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
+ */
+router.get('/:id/detail', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    
+    if (isNaN(id)) {
+      return res.status(400).json({
+        success: false,
+        error: '유효하지 않은 ID입니다.'
+      });
+    }
+
+    const result = await expertService.getExpertDetailById(id);
+    
+    if (result.success) {
+      return res.json(result);
+    } else {
+      return res.status(404).json(result);
+    }
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: '서버 오류가 발생했습니다.'
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/experts:
+ *   get:
+ *     summary: 전문가 목록 조회
+ *     tags: [Experts]
  *     parameters:
  *       - in: query
  *         name: page
@@ -173,20 +254,44 @@ router.get('/:id', async (req, res) => {
  *           default: 10
  *         description: 페이지당 항목 수
  *       - in: query
- *         name: user_type
- *         schema:
- *           type: string
- *           enum: [client, expert, admin]
- *         description: 사용자 타입 필터
- *       - in: query
- *         name: user_status
+ *         name: expert_status
  *         schema:
  *           type: string
  *           enum: [active, inactive, pending, deleted]
- *         description: 사용자 상태 필터
+ *         description: 전문가 상태 필터
+ *       - in: query
+ *         name: expert_location
+ *         schema:
+ *           type: string
+ *         description: 전문가 위치 필터
+ *       - in: query
+ *         name: group_id
+ *         schema:
+ *           type: integer
+ *         description: 그룹 ID 필터
+ *       - in: query
+ *         name: include_user
+ *         schema:
+ *           type: boolean
+ *         description: 사용자 정보 포함 여부
+ *       - in: query
+ *         name: include_group
+ *         schema:
+ *           type: boolean
+ *         description: 그룹 정보 포함 여부
+ *       - in: query
+ *         name: include_contents
+ *         schema:
+ *           type: boolean
+ *         description: 콘텐츠 정보 포함 여부
+ *       - in: query
+ *         name: include_ai_services
+ *         schema:
+ *           type: boolean
+ *         description: AI 서비스 정보 포함 여부
  *     responses:
  *       200:
- *         description: 사용자 목록 조회 성공
+ *         description: 전문가 목록 조회 성공
  *         content:
  *           application/json:
  *             schema:
@@ -210,16 +315,31 @@ router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query['page'] as string) || 1;
     const limit = parseInt(req.query['limit'] as string) || 10;
-    const user_type = req.query['user_type'] as string;
-    const user_status = req.query['user_status'] as string;
+    const expert_status = req.query['expert_status'] as string;
+    const expert_location = req.query['expert_location'] as string;
+    const group_id = req.query['group_id'] ? parseInt(req.query['group_id'] as string) : undefined;
+
+    // 관련 데이터 포함 옵션 파싱
+    const include_user = req.query['include_user'] === 'true';
+    const include_group = req.query['include_group'] === 'true';
+    const include_contents = req.query['include_contents'] === 'true';
+    const include_ai_services = req.query['include_ai_services'] === 'true';
 
     const params: PaginationParams = { page, limit };
-    const filters: UserFilters = {};
+    const filters: ExpertFilters = {};
+    const options: ExpertListOptions = {};
     
-    if (user_type) filters.user_type = user_type;
-    if (user_status) filters.user_status = user_status;
+    if (expert_status) filters.expert_status = expert_status;
+    if (expert_location) filters.expert_location = expert_location;
+    if (group_id) filters.group_id = group_id;
 
-    const result = await userService.getUsers(params, filters);
+    // 관련 데이터 포함 옵션 설정
+    if (include_user) options.include_user = true;
+    if (include_group) options.include_group = true;
+    if (include_contents) options.include_contents = true;
+    if (include_ai_services) options.include_ai_services = true;
+
+    const result = await expertService.getExperts(params, filters, options);
     
     if (result.success) {
       res.json(result);
@@ -236,10 +356,10 @@ router.get('/', async (req, res) => {
 
 /**
  * @swagger
- * /api/users/search:
+ * /api/experts/search:
  *   get:
- *     summary: 사용자 검색
- *     tags: [Users]
+ *     summary: 전문가 검색
+ *     tags: [Experts]
  *     parameters:
  *       - in: query
  *         name: q
@@ -249,7 +369,7 @@ router.get('/', async (req, res) => {
  *         description: 검색어
  *     responses:
  *       200:
- *         description: 사용자 검색 성공
+ *         description: 전문가 검색 성공
  *         content:
  *           application/json:
  *             schema:
@@ -278,7 +398,7 @@ router.get('/search', async (req, res) => {
       });
     }
 
-    const result = await userService.searchUsers(searchTerm);
+    const result = await expertService.searchExperts(searchTerm);
     
     if (result.success) {
       return res.json(result);
@@ -295,17 +415,17 @@ router.get('/search', async (req, res) => {
 
 /**
  * @swagger
- * /api/users/{id}:
+ * /api/experts/{id}:
  *   put:
- *     summary: 사용자 정보 수정
- *     tags: [Users]
+ *     summary: 전문가 정보 수정
+ *     tags: [Experts]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: integer
- *         description: 사용자 ID
+ *         description: 전문가 ID
  *     requestBody:
  *       required: true
  *       content:
@@ -313,23 +433,40 @@ router.get('/search', async (req, res) => {
  *           schema:
  *             type: object
  *             properties:
- *               username:
+ *               group_id:
+ *                 type: integer
+ *                 description: 그룹 ID
+ *               expert_name:
  *                 type: string
- *                 description: 사용자명
- *               email:
+ *                 description: 전문가명
+ *               expert_title:
  *                 type: string
- *                 description: 이메일
- *               user_type:
+ *                 description: 전문가 직함
+ *               expert_bio:
  *                 type: string
- *                 enum: [client, expert, admin]
- *                 description: 사용자 타입
- *               user_status:
+ *                 description: 전문가 소개
+ *               expert_avatar:
+ *                 type: string
+ *                 description: 전문가 프로필 이미지 URL
+ *               expert_website:
+ *                 type: string
+ *                 description: 전문가 웹사이트
+ *               expert_email:
+ *                 type: string
+ *                 description: 전문가 이메일
+ *               expert_phone:
+ *                 type: string
+ *                 description: 전문가 전화번호
+ *               expert_location:
+ *                 type: string
+ *                 description: 전문가 위치
+ *               expert_status:
  *                 type: string
  *                 enum: [active, inactive, pending, deleted]
- *                 description: 사용자 상태
+ *                 description: 전문가 상태
  *     responses:
  *       200:
- *         description: 사용자 정보 수정 성공
+ *         description: 전문가 정보 수정 성공
  *         content:
  *           application/json:
  *             schema:
@@ -341,7 +478,7 @@ router.get('/search', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/ApiResponse'
  *       404:
- *         description: 사용자를 찾을 수 없음
+ *         description: 전문가를 찾을 수 없음
  *         content:
  *           application/json:
  *             schema:
@@ -356,7 +493,7 @@ router.get('/search', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const userData: UserUpdateRequest = req.body;
+    const expertData: ExpertUpdateRequest = req.body;
     
     if (isNaN(id)) {
       return res.status(400).json({
@@ -365,7 +502,7 @@ router.put('/:id', async (req, res) => {
       });
     }
 
-    const result = await userService.updateUser(id, userData);
+    const result = await expertService.updateExpert(id, expertData);
     
     if (result.success) {
       return res.json(result);
@@ -382,20 +519,20 @@ router.put('/:id', async (req, res) => {
 
 /**
  * @swagger
- * /api/users/{id}:
+ * /api/experts/{id}:
  *   delete:
- *     summary: 사용자 삭제 (소프트 삭제)
- *     tags: [Users]
+ *     summary: 전문가 삭제 (소프트 삭제)
+ *     tags: [Experts]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: integer
- *         description: 사용자 ID
+ *         description: 전문가 ID
  *     responses:
  *       200:
- *         description: 사용자 삭제 성공
+ *         description: 전문가 삭제 성공
  *         content:
  *           application/json:
  *             schema:
@@ -407,7 +544,7 @@ router.put('/:id', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/ApiResponse'
  *       404:
- *         description: 사용자를 찾을 수 없음
+ *         description: 전문가를 찾을 수 없음
  *         content:
  *           application/json:
  *             schema:
@@ -430,7 +567,7 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    const result = await userService.deleteUser(id);
+    const result = await expertService.deleteExpert(id);
     
     if (result.success) {
       return res.json(result);
@@ -447,13 +584,13 @@ router.delete('/:id', async (req, res) => {
 
 /**
  * @swagger
- * /api/users/stats/overview:
+ * /api/experts/stats/overview:
  *   get:
- *     summary: 사용자 통계 조회
- *     tags: [Users]
+ *     summary: 전문가 통계 조회
+ *     tags: [Experts]
  *     responses:
  *       200:
- *         description: 사용자 통계 조회 성공
+ *         description: 전문가 통계 조회 성공
  *         content:
  *           application/json:
  *             schema:
@@ -473,7 +610,7 @@ router.delete('/:id', async (req, res) => {
  */
 router.get('/stats/overview', async (_req, res) => {
   try {
-    const result = await userService.getUserStats();
+    const result = await expertService.getExpertStats();
     
     if (result.success) {
       res.json(result);

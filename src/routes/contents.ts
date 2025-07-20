@@ -1,22 +1,22 @@
 import express from 'express';
-import userService from '../services/userService';
-import { UserCreateRequest, UserUpdateRequest, UserFilters, PaginationParams } from '../types/database';
+import contentService from '../services/contentService';
+import { ContentCreateRequest, ContentUpdateRequest, ContentFilters, ContentListOptions, PaginationParams } from '../types/database';
 
 const router = express.Router();
 
 /**
  * @swagger
  * tags:
- *   name: Users
- *   description: 사용자 관리 API
+ *   name: Contents
+ *   description: 콘텐츠 관리 API
  */
 
 /**
  * @swagger
- * /api/users:
+ * /api/contents:
  *   post:
- *     summary: 사용자 생성
- *     tags: [Users]
+ *     summary: 콘텐츠 생성
+ *     tags: [Contents]
  *     requestBody:
  *       required: true
  *       content:
@@ -24,26 +24,42 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             properties:
- *               username:
+ *               content_title:
  *                 type: string
- *                 description: 사용자명
- *               email:
+ *                 description: 콘텐츠 제목
+ *               content_description:
  *                 type: string
- *                 description: 이메일
- *               password:
+ *                 description: 콘텐츠 설명
+ *               content_url:
  *                 type: string
- *                 description: 비밀번호
- *               user_type:
+ *                 description: 콘텐츠 URL
+ *               content_type:
  *                 type: string
- *                 enum: [client, expert, admin]
- *                 description: 사용자 타입
+ *                 description: 콘텐츠 타입
+ *               content_order_index:
+ *                 type: integer
+ *                 description: 콘텐츠 순서
+ *               category_ids:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 description: 카테고리 ID 배열
+ *               tag_ids:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 description: 태그 ID 배열
+ *               ai_service_ids:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 description: AI 서비스 ID 배열
  *             required:
- *               - username
- *               - email
- *               - password
+ *               - content_title
+ *               - content_type
  *     responses:
  *       201:
- *         description: 사용자가 성공적으로 생성됨
+ *         description: 콘텐츠가 성공적으로 생성됨
  *         content:
  *           application/json:
  *             schema:
@@ -63,17 +79,17 @@ const router = express.Router();
  */
 router.post('/', async (req, res) => {
   try {
-    const userData: UserCreateRequest = req.body;
+    const contentData: ContentCreateRequest = req.body;
     
     // 필수 필드 검증
-    if (!userData.username || !userData.email || !userData.password) {
+    if (!contentData.content_title || !contentData.content_type) {
       return res.status(400).json({
         success: false,
-        error: '사용자명, 이메일, 비밀번호는 필수입니다.'
+        error: '콘텐츠 제목과 타입은 필수입니다.'
       });
     }
 
-    const result = await userService.createUser(userData);
+    const result = await contentService.createContent(contentData);
     
     if (result.success) {
       return res.status(201).json(result);
@@ -90,20 +106,20 @@ router.post('/', async (req, res) => {
 
 /**
  * @swagger
- * /api/users/{id}:
+ * /api/contents/{id}:
  *   get:
- *     summary: ID로 사용자 조회
- *     tags: [Users]
+ *     summary: ID로 콘텐츠 조회
+ *     tags: [Contents]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: integer
- *         description: 사용자 ID
+ *         description: 콘텐츠 ID
  *     responses:
  *       200:
- *         description: 사용자 정보 조회 성공
+ *         description: 콘텐츠 정보 조회 성공
  *         content:
  *           application/json:
  *             schema:
@@ -115,7 +131,7 @@ router.post('/', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/ApiResponse'
  *       404:
- *         description: 사용자를 찾을 수 없음
+ *         description: 콘텐츠를 찾을 수 없음
  *         content:
  *           application/json:
  *             schema:
@@ -138,7 +154,7 @@ router.get('/:id', async (req, res) => {
       });
     }
 
-    const result = await userService.getUserById(id);
+    const result = await contentService.getContentById(id);
     
     if (result.success) {
       return res.json(result);
@@ -155,10 +171,75 @@ router.get('/:id', async (req, res) => {
 
 /**
  * @swagger
- * /api/users:
+ * /api/contents/{id}/detail:
  *   get:
- *     summary: 사용자 목록 조회
- *     tags: [Users]
+ *     summary: 콘텐츠 상세 조회 (관련 데이터 포함)
+ *     tags: [Contents]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 콘텐츠 ID
+ *     responses:
+ *       200:
+ *         description: 콘텐츠 상세 정보 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
+ *       400:
+ *         description: 잘못된 요청
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
+ *       404:
+ *         description: 콘텐츠를 찾을 수 없음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
+ *       500:
+ *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
+ */
+router.get('/:id/detail', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    
+    if (isNaN(id)) {
+      return res.status(400).json({
+        success: false,
+        error: '유효하지 않은 ID입니다.'
+      });
+    }
+
+    const result = await contentService.getContentDetailById(id);
+    
+    if (result.success) {
+      return res.json(result);
+    } else {
+      return res.status(404).json(result);
+    }
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: '서버 오류가 발생했습니다.'
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/contents:
+ *   get:
+ *     summary: 콘텐츠 목록 조회
+ *     tags: [Contents]
  *     parameters:
  *       - in: query
  *         name: page
@@ -173,20 +254,54 @@ router.get('/:id', async (req, res) => {
  *           default: 10
  *         description: 페이지당 항목 수
  *       - in: query
- *         name: user_type
- *         schema:
- *           type: string
- *           enum: [client, expert, admin]
- *         description: 사용자 타입 필터
- *       - in: query
- *         name: user_status
+ *         name: content_status
  *         schema:
  *           type: string
  *           enum: [active, inactive, pending, deleted]
- *         description: 사용자 상태 필터
+ *         description: 콘텐츠 상태 필터
+ *       - in: query
+ *         name: content_type
+ *         schema:
+ *           type: string
+ *         description: 콘텐츠 타입 필터
+ *       - in: query
+ *         name: category_id
+ *         schema:
+ *           type: integer
+ *         description: 카테고리 ID 필터
+ *       - in: query
+ *         name: tag_id
+ *         schema:
+ *           type: integer
+ *         description: 태그 ID 필터
+ *       - in: query
+ *         name: ai_service_id
+ *         schema:
+ *           type: integer
+ *         description: AI 서비스 ID 필터
+ *       - in: query
+ *         name: include_categories
+ *         schema:
+ *           type: boolean
+ *         description: 카테고리 정보 포함 여부
+ *       - in: query
+ *         name: include_tags
+ *         schema:
+ *           type: boolean
+ *         description: 태그 정보 포함 여부
+ *       - in: query
+ *         name: include_ai_services
+ *         schema:
+ *           type: boolean
+ *         description: AI 서비스 정보 포함 여부
+ *       - in: query
+ *         name: include_experts
+ *         schema:
+ *           type: boolean
+ *         description: 전문가 정보 포함 여부
  *     responses:
  *       200:
- *         description: 사용자 목록 조회 성공
+ *         description: 콘텐츠 목록 조회 성공
  *         content:
  *           application/json:
  *             schema:
@@ -210,16 +325,35 @@ router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query['page'] as string) || 1;
     const limit = parseInt(req.query['limit'] as string) || 10;
-    const user_type = req.query['user_type'] as string;
-    const user_status = req.query['user_status'] as string;
+    const content_status = req.query['content_status'] as string;
+    const content_type = req.query['content_type'] as string;
+    const category_id = req.query['category_id'] ? parseInt(req.query['category_id'] as string) : undefined;
+    const tag_id = req.query['tag_id'] ? parseInt(req.query['tag_id'] as string) : undefined;
+    const ai_service_id = req.query['ai_service_id'] ? parseInt(req.query['ai_service_id'] as string) : undefined;
+
+    // 관련 데이터 포함 옵션 파싱
+    const include_categories = req.query['include_categories'] === 'true';
+    const include_tags = req.query['include_tags'] === 'true';
+    const include_ai_services = req.query['include_ai_services'] === 'true';
+    const include_experts = req.query['include_experts'] === 'true';
 
     const params: PaginationParams = { page, limit };
-    const filters: UserFilters = {};
+    const filters: ContentFilters = {};
+    const options: ContentListOptions = {};
     
-    if (user_type) filters.user_type = user_type;
-    if (user_status) filters.user_status = user_status;
+    if (content_status) filters.content_status = content_status;
+    if (content_type) filters.content_type = content_type;
+    if (category_id) filters.category_id = category_id;
+    if (tag_id) filters.tag_id = tag_id;
+    if (ai_service_id) filters.ai_service_id = ai_service_id;
 
-    const result = await userService.getUsers(params, filters);
+    // 관련 데이터 포함 옵션 설정
+    if (include_categories) options.include_categories = true;
+    if (include_tags) options.include_tags = true;
+    if (include_ai_services) options.include_ai_services = true;
+    if (include_experts) options.include_experts = true;
+
+    const result = await contentService.getContents(params, filters, options);
     
     if (result.success) {
       res.json(result);
@@ -236,10 +370,10 @@ router.get('/', async (req, res) => {
 
 /**
  * @swagger
- * /api/users/search:
+ * /api/contents/search:
  *   get:
- *     summary: 사용자 검색
- *     tags: [Users]
+ *     summary: 콘텐츠 검색
+ *     tags: [Contents]
  *     parameters:
  *       - in: query
  *         name: q
@@ -249,7 +383,7 @@ router.get('/', async (req, res) => {
  *         description: 검색어
  *     responses:
  *       200:
- *         description: 사용자 검색 성공
+ *         description: 콘텐츠 검색 성공
  *         content:
  *           application/json:
  *             schema:
@@ -278,7 +412,7 @@ router.get('/search', async (req, res) => {
       });
     }
 
-    const result = await userService.searchUsers(searchTerm);
+    const result = await contentService.searchContents(searchTerm);
     
     if (result.success) {
       return res.json(result);
@@ -295,17 +429,17 @@ router.get('/search', async (req, res) => {
 
 /**
  * @swagger
- * /api/users/{id}:
+ * /api/contents/{id}:
  *   put:
- *     summary: 사용자 정보 수정
- *     tags: [Users]
+ *     summary: 콘텐츠 정보 수정
+ *     tags: [Contents]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: integer
- *         description: 사용자 ID
+ *         description: 콘텐츠 ID
  *     requestBody:
  *       required: true
  *       content:
@@ -313,23 +447,28 @@ router.get('/search', async (req, res) => {
  *           schema:
  *             type: object
  *             properties:
- *               username:
+ *               content_title:
  *                 type: string
- *                 description: 사용자명
- *               email:
+ *                 description: 콘텐츠 제목
+ *               content_description:
  *                 type: string
- *                 description: 이메일
- *               user_type:
+ *                 description: 콘텐츠 설명
+ *               content_url:
  *                 type: string
- *                 enum: [client, expert, admin]
- *                 description: 사용자 타입
- *               user_status:
+ *                 description: 콘텐츠 URL
+ *               content_type:
+ *                 type: string
+ *                 description: 콘텐츠 타입
+ *               content_order_index:
+ *                 type: integer
+ *                 description: 콘텐츠 순서
+ *               content_status:
  *                 type: string
  *                 enum: [active, inactive, pending, deleted]
- *                 description: 사용자 상태
+ *                 description: 콘텐츠 상태
  *     responses:
  *       200:
- *         description: 사용자 정보 수정 성공
+ *         description: 콘텐츠 정보 수정 성공
  *         content:
  *           application/json:
  *             schema:
@@ -341,7 +480,7 @@ router.get('/search', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/ApiResponse'
  *       404:
- *         description: 사용자를 찾을 수 없음
+ *         description: 콘텐츠를 찾을 수 없음
  *         content:
  *           application/json:
  *             schema:
@@ -356,7 +495,7 @@ router.get('/search', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const userData: UserUpdateRequest = req.body;
+    const contentData: ContentUpdateRequest = req.body;
     
     if (isNaN(id)) {
       return res.status(400).json({
@@ -365,7 +504,7 @@ router.put('/:id', async (req, res) => {
       });
     }
 
-    const result = await userService.updateUser(id, userData);
+    const result = await contentService.updateContent(id, contentData);
     
     if (result.success) {
       return res.json(result);
@@ -382,20 +521,20 @@ router.put('/:id', async (req, res) => {
 
 /**
  * @swagger
- * /api/users/{id}:
+ * /api/contents/{id}:
  *   delete:
- *     summary: 사용자 삭제 (소프트 삭제)
- *     tags: [Users]
+ *     summary: 콘텐츠 삭제 (소프트 삭제)
+ *     tags: [Contents]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: integer
- *         description: 사용자 ID
+ *         description: 콘텐츠 ID
  *     responses:
  *       200:
- *         description: 사용자 삭제 성공
+ *         description: 콘텐츠 삭제 성공
  *         content:
  *           application/json:
  *             schema:
@@ -407,7 +546,7 @@ router.put('/:id', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/ApiResponse'
  *       404:
- *         description: 사용자를 찾을 수 없음
+ *         description: 콘텐츠를 찾을 수 없음
  *         content:
  *           application/json:
  *             schema:
@@ -430,7 +569,7 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    const result = await userService.deleteUser(id);
+    const result = await contentService.deleteContent(id);
     
     if (result.success) {
       return res.json(result);
@@ -447,13 +586,13 @@ router.delete('/:id', async (req, res) => {
 
 /**
  * @swagger
- * /api/users/stats/overview:
+ * /api/contents/stats/overview:
  *   get:
- *     summary: 사용자 통계 조회
- *     tags: [Users]
+ *     summary: 콘텐츠 통계 조회
+ *     tags: [Contents]
  *     responses:
  *       200:
- *         description: 사용자 통계 조회 성공
+ *         description: 콘텐츠 통계 조회 성공
  *         content:
  *           application/json:
  *             schema:
@@ -473,7 +612,7 @@ router.delete('/:id', async (req, res) => {
  */
 router.get('/stats/overview', async (_req, res) => {
   try {
-    const result = await userService.getUserStats();
+    const result = await contentService.getContentStats();
     
     if (result.success) {
       res.json(result);

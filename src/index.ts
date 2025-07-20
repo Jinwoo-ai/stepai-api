@@ -18,10 +18,10 @@ import { specs } from './configs/swagger';
 
 // 라우터 임포트
 import userRoutes from './routes/users';
+import groupRoutes from './routes/groups';
+import expertRoutes from './routes/experts';
+import contentRoutes from './routes/contents';
 import aiServiceRoutes from './routes/aiServices';
-import aiServiceContentRoutes from './routes/aiServiceContents';
-import aiServiceTagRoutes from './routes/aiServiceTags';
-import aiCategoryRoutes from './routes/aiCategories';
 import assetRoutes from './routes/assets';
 
 const app = express();
@@ -118,10 +118,10 @@ if (fs.existsSync(assetsPath)) {
 
 // API 라우터 설정
 app.use('/api/users', userRoutes);
+app.use('/api/groups', groupRoutes);
+app.use('/api/experts', expertRoutes);
+app.use('/api/contents', contentRoutes);
 app.use('/api/ai-services', aiServiceRoutes);
-app.use('/api/ai-service-contents', aiServiceContentRoutes);
-app.use('/api/ai-service-tags', aiServiceTagRoutes);
-app.use('/api/ai-categories', aiCategoryRoutes);
 app.use('/api/assets', assetRoutes);
 
 // 404 에러 핸들러
