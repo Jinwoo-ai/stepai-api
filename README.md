@@ -1,13 +1,13 @@
 # StepAI API
 
-StepAI API는 AI 서비스 관리 시스템을 위한 RESTful API 서버입니다.
+StepAI API는 AI 서비스 소개 및 이용방법 추천 서비스를 위한 RESTful API 서버입니다.
 
 ## 🚀 기능
 
-- **사용자 관리**: 사용자 CRUD 작업
-- **AI 서비스 관리**: AI 서비스 정보 관리
-- **콘텐츠 관리**: AI 서비스별 콘텐츠 관리
-- **태그 관리**: AI 서비스 태그 관리
+- **AI 서비스 관리**: AI 서비스 정보 및 콘텐츠 관리
+- **AI 영상 관리**: AI 활용 영상 콘텐츠 관리
+- **카테고리 관리**: 계층적 카테고리 구조 (메인/서브)
+- **대시보드**: 통계 및 현황 조회
 - **파일 업로드**: 이미지 및 파일 업로드 관리
 - **페이지네이션**: 대용량 데이터 처리
 - **필터링**: 다양한 조건으로 데이터 검색
@@ -65,32 +65,35 @@ npm start
 
 ## 📊 API 엔드포인트
 
-### 사용자 관리
-- `POST /api/users` - 사용자 생성
-- `GET /api/users` - 사용자 목록 조회
-- `GET /api/users/:id` - 사용자 조회 (ID)
-- `GET /api/users/email/:email` - 사용자 조회 (이메일)
-- `PUT /api/users/:id` - 사용자 정보 수정
-- `DELETE /api/users/:id` - 사용자 삭제
-
 ### AI 서비스 관리
+- `GET /api/ai-services` - AI 서비스 목록 조회 (페이지네이션, 필터링 지원)
 - `POST /api/ai-services` - AI 서비스 생성
-- `GET /api/ai-services` - AI 서비스 목록 조회 (관련 데이터 포함 옵션 지원)
-- `GET /api/ai-services/:id` - AI 서비스 조회
-- `GET /api/ai-services/:id/detail` - AI 서비스 상세 조회 (관련 데이터 포함)
 - `PUT /api/ai-services/:id` - AI 서비스 정보 수정
-- `DELETE /api/ai-services/:id` - AI 서비스 삭제
+- `DELETE /api/ai-services/:id` - AI 서비스 삭제 (소프트 삭제)
 - `GET /api/ai-services/search` - AI 서비스 검색
-- `GET /api/ai-services/stats/overview` - AI 서비스 통계
+- `GET /api/ai-services/:id/contents` - AI 서비스 콘텐츠 조회
+- `POST /api/ai-services/:id/contents` - AI 서비스 콘텐츠 저장
 
-### 파일 업로드 관리
-- `POST /api/assets/upload/:type` - 파일 업로드 (categories, companies, ai-services)
-- `GET /api/assets/list/:type` - 파일 목록 조회
-- `DELETE /api/assets/delete/:type/:filename` - 파일 삭제
-- `GET /assets/:type/:filename` - 파일 다운로드
+### AI 영상 관리
+- `GET /api/ai-videos` - AI 영상 목록 조회 (페이지네이션, 필터링 지원)
+- `POST /api/ai-videos` - AI 영상 생성
+- `GET /api/ai-videos/:id` - AI 영상 상세 조회
+- `PUT /api/ai-videos/:id` - AI 영상 정보 수정
+- `DELETE /api/ai-videos/:id` - AI 영상 삭제 (소프트 삭제)
+
+### 카테고리 관리
+- `GET /api/categories` - 카테고리 목록 조회 (계층 구조)
+- `POST /api/categories` - 카테고리 생성
+- `PUT /api/categories/:id` - 카테고리 수정
+- `DELETE /api/categories/:id` - 카테고리 삭제
+- `PUT /api/categories/:id/reorder` - 카테고리 순서 변경 (드래그 앤 드롭)
+
+### 대시보드
+- `GET /api/dashboard/stats` - 대시보드 통계 조회
 
 ### 헬스 체크
 - `GET /health` - 서버 상태 확인
+- `GET /` - API 정보 및 엔드포인트 목록
 
 ## 🔧 환경 설정
 
@@ -99,7 +102,7 @@ npm start
 | 변수명 | 설명 | 기본값 |
 |--------|------|--------|
 | NODE_ENV | 실행 환경 | development |
-| PORT | 서버 포트 | 3000 |
+| PORT | 서버 포트 | 3004 |
 | DB_HOST | 데이터베이스 호스트 | localhost |
 | DB_PORT | 데이터베이스 포트 | 3306 |
 | DB_USER | 데이터베이스 사용자 | root |
@@ -132,22 +135,32 @@ DB_NAME=stepai_prod
 stepai_api/
 ├── src/
 │   ├── configs/
-│   │   └── database.ts          # 데이터베이스 설정
-│   ├── services/
-│   │   ├── userService.ts       # 사용자 서비스
-│   │   ├── aiService.ts         # AI 서비스
-│   │   ├── aiServiceContent.ts  # AI 서비스 콘텐츠
-│   │   └── aiServiceTag.ts      # AI 서비스 태그
+│   │   ├── database.ts          # 데이터베이스 설정
+│   │   ├── swagger.ts           # Swagger 설정
+│   │   └── upload.ts            # 파일 업로드 설정
 │   ├── routes/
-│   │   ├── users.ts             # 사용자 라우터
-│   │   └── aiServices.ts        # AI 서비스 라우터
+│   │   ├── aiServices.ts        # AI 서비스 라우터
+│   │   ├── aiVideos.ts          # AI 영상 라우터
+│   │   ├── categories.ts        # 카테고리 라우터
+│   │   └── dashboard.ts         # 대시보드 라우터
+│   ├── services/
+│   │   └── userService.ts       # 사용자 서비스
 │   ├── types/
 │   │   └── database.ts          # 타입 정의
 │   └── index.ts                 # 메인 애플리케이션
 ├── db/
-│   └── create_tables.sql        # 데이터베이스 스키마
+│   ├── create_tables.sql        # 데이터베이스 스키마
+│   ├── stepai_api.d2           # 데이터베이스 다이어그램
+│   └── stepai_api.svg          # 데이터베이스 다이어그램 (SVG)
+├── docs/                        # API 문서
+├── public/assets/               # 정적 파일 (업로드된 이미지 등)
+├── stepai-admin/               # 관리자 프론트엔드
+├── scripts/
+│   └── deploy.sh               # 배포 스크립트
 ├── package.json
 ├── tsconfig.json
+├── Dockerfile                  # Docker 설정
+├── railway.json               # Railway 배포 설정
 └── README.md
 ```
 

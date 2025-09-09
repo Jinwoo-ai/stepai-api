@@ -1,30 +1,31 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import path from 'path';
 import { testConnection } from './configs/database';
-import { trackContentView } from './middleware/contentViewTracker';
 
 // 라우터들 import
-import usersRouter from './routes/users';
-import groupsRouter from './routes/groups';
-import expertsRouter from './routes/experts';
-import contentsRouter from './routes/contents';
 import aiServicesRouter from './routes/aiServices';
-import rankingsRouter from './routes/rankings';
-import assetsRouter from './routes/assets';
+import aiVideosRouter from './routes/aiVideos';
+import categoriesRouter from './routes/categories';
+import dashboardRouter from './routes/dashboard';
+import curationsRouter from './routes/curations';
+import usersRouter from './routes/users';
+import siteSettingsRouter from './routes/siteSettings';
 
 const app = express();
-const PORT = process.env['PORT'] || 3000;
+const PORT = parseInt(process.env['PORT'] || '3004');
 
 // 미들웨어 설정
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 콘텐츠 조회 추적 미들웨어 (라우터보다 먼저 적용)
-app.use(trackContentView);
+
 
 // 정적 파일 서빙
 app.use('/assets', express.static(path.join(__dirname, '../public/assets')));
@@ -108,13 +109,13 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // API 라우터들
-app.use('/api/users', usersRouter);
-app.use('/api/groups', groupsRouter);
-app.use('/api/experts', expertsRouter);
-app.use('/api/contents', contentsRouter);
 app.use('/api/ai-services', aiServicesRouter);
-app.use('/api/rankings', rankingsRouter);
-app.use('/api/assets', assetsRouter);
+app.use('/api/ai-videos', aiVideosRouter);
+app.use('/api/categories', categoriesRouter);
+app.use('/api/dashboard', dashboardRouter);
+app.use('/api/curations', curationsRouter);
+app.use('/api/users', usersRouter);
+app.use('/api/site-settings', siteSettingsRouter);
 
 // 헬스체크 엔드포인트
 app.get('/health', async (_req, res) => {
@@ -143,13 +144,13 @@ app.get('/', (_req, res) => {
     endpoints: {
       docs: '/api-docs',
       health: '/health',
-      users: '/api/users',
-      groups: '/api/groups',
-      experts: '/api/experts',
-      contents: '/api/contents',
       aiServices: '/api/ai-services',
-      rankings: '/api/rankings',
-      assets: '/api/assets'
+      aiVideos: '/api/ai-videos',
+      categories: '/api/categories',
+      dashboard: '/api/dashboard',
+      curations: '/api/curations',
+      users: '/api/users',
+      siteSettings: '/api/site-settings'
     }
   });
 });
@@ -176,7 +177,7 @@ app.listen(PORT, () => {
   console.log(`🚀 StepAI API 서버가 포트 ${PORT}에서 실행 중입니다.`);
   console.log(`📚 API 문서: http://localhost:${PORT}/api-docs`);
   console.log(`💚 헬스체크: http://localhost:${PORT}/health`);
-  console.log(`📊 콘텐츠 조회 추적이 활성화되었습니다.`);
+
 });
 
 export default app;

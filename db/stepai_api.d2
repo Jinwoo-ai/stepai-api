@@ -1,51 +1,14 @@
-# StepAI API Database Schema - AI 전문가 매칭 서비스
+# StepAI API Database Schema - AI 서비스 소개 및 이용방법 추천 서비스
 
-# Users 테이블 (일반 사용자)
+# Users 테이블 (회원)
 users: {
   shape: sql_table
   id: int {constraint: primary_key}
   username: varchar(50) 
   email: varchar(100) {constraint: unique}
   password_hash: varchar(255)
-  user_type: varchar(20) # client, expert, admin
+  user_type: varchar(20) # member, admin
   user_status: varchar(20) # active, inactive, pending, deleted
-  deleted_at: timestamp
-  created_at: timestamp
-  updated_at: timestamp
-}
-
-# Groups 테이블 (전문가 그룹)
-groups: {
-  shape: sql_table
-  id: int {constraint: primary_key}
-  group_name: varchar(100)
-  group_description: text
-  group_logo: varchar(255)
-  group_website: varchar(255)
-  group_email: varchar(100)
-  group_phone: varchar(20)
-  group_address: varchar(255)
-  group_status: varchar(20) # active, inactive, pending, deleted
-  deleted_at: timestamp
-  created_at: timestamp
-  updated_at: timestamp
-}
-
-# Experts 테이블 (AI 전문가)
-experts: {
-  shape: sql_table
-  id: int {constraint: primary_key}
-  user_id: int {constraint: foreign_key}
-  group_id: int {constraint: foreign_key}
-  expert_name: varchar(100)
-  expert_title: varchar(100)
-  expert_bio: text
-  expert_avatar: varchar(255)
-  expert_website: varchar(255)
-  expert_email: varchar(100)
-  expert_phone: varchar(20)
-  expert_location: varchar(255)
-  expert_status: varchar(20) # active, inactive, pending, deleted
   deleted_at: timestamp
   created_at: timestamp
   updated_at: timestamp
@@ -57,136 +20,127 @@ ai_services: {
   id: int {constraint: primary_key}
   ai_name: varchar(100)
   ai_description: text
-  ai_type: varchar(255)  # LLM, RAG, gpts, prompter, etc.
+  ai_type: varchar(255) # LLM, RAG, GPTs, Image_Generation, Video_Generation, etc.
+  ai_website: varchar(255)
+  ai_logo: varchar(255)
+  pricing_model: varchar(50) # free, freemium, paid, subscription
+  pricing_info: text
+  difficulty_level: varchar(20) # beginner, intermediate, advanced
   ai_status: varchar(20) # active, inactive, pending, deleted
+  is_visible: boolean # 사이트 노출여부
+  is_step_pick: boolean # Step Pick 여부
   nationality: varchar(20)
   deleted_at: timestamp
   created_at: timestamp
   updated_at: timestamp
 }
 
-# Contents 테이블 (AI로 만든 결과물)
-contents: {
+# AI Videos 테이블 (AI 영상)
+ai_videos: {
   shape: sql_table
   id: int {constraint: primary_key}
-  content_title: varchar(200)
-  content_description: text
-  content_url: varchar(255)
-  content_type: varchar(20) # link, logo, image, video, text, audio, pdf, etc.
-  content_order_index: int
-  content_status: varchar(20) # active, inactive, pending, deleted
+  video_title: varchar(200)
+  video_description: text
+  video_url: varchar(255)
+  thumbnail_url: varchar(255)
+  duration: int # 초 단위
+  video_status: varchar(20) # active, inactive, pending, deleted
+  is_visible: boolean # 사이트 노출여부
+  view_count: int
+  like_count: int
   deleted_at: timestamp
   created_at: timestamp
   updated_at: timestamp
 }
 
-# Content Categories 테이블 (콘텐츠 카테고리)
-content_categories: {
+# Categories 테이블 (카테고리 - 메인/서브 구조)
+categories: {
   shape: sql_table
   id: int {constraint: primary_key}
   category_name: varchar(100)
-  category_icon: varchar(255)
   category_description: text
+  category_icon: varchar(255)
+  parent_id: int {constraint: foreign_key} # 부모 카테고리 ID (NULL이면 메인 카테고리)
+  category_order: int
+  category_status: varchar(20) # active, inactive
   created_at: timestamp
   updated_at: timestamp
 }
 
-# Content Tags 테이블 (콘텐츠 태그)
-content_tags: {
+# Curations 테이블 (큐레이션)
+curations: {
   shape: sql_table
   id: int {constraint: primary_key}
-  tag_name: varchar(100)
-  tag_description: text
+  curation_title: varchar(200)
+  curation_description: text
+  curation_thumbnail: varchar(255)
+  curation_order: int
+  curation_status: varchar(20) # active, inactive, pending, deleted
+  deleted_at: timestamp
   created_at: timestamp
   updated_at: timestamp
 }
 
-# Expert Contents 테이블 (전문가가 만든 콘텐츠)
-expert_contents: {
+# AI Service Categories 테이블 (AI 서비스-카테고리 관계)
+ai_service_categories: {
   shape: sql_table
   id: int {constraint: primary_key}
-  expert_id: int {constraint: foreign_key}
-  content_id: int {constraint: foreign_key}
+  ai_service_id: int {constraint: foreign_key}
+  category_id: int {constraint: foreign_key}
+  is_main_category: boolean # 메인(대표) 카테고리 여부
   created_at: timestamp
   updated_at: timestamp
 }
 
-# Content Category Relations 테이블 (콘텐츠-카테고리 관계)
-content_category_relations: {
+# AI Video Categories 테이블 (AI 영상-카테고리 관계)
+ai_video_categories: {
   shape: sql_table
   id: int {constraint: primary_key}
-  content_id: int {constraint: foreign_key}
+  ai_video_id: int {constraint: foreign_key}
   category_id: int {constraint: foreign_key}
   created_at: timestamp
   updated_at: timestamp
 }
 
-# Content Tag Relations 테이블 (콘텐츠-태그 관계)
-content_tag_relations: {
+# AI Video Services 테이블 (AI 영상에서 사용된 AI 서비스)
+ai_video_services: {
   shape: sql_table
   id: int {constraint: primary_key}
-  content_id: int {constraint: foreign_key}
-  tag_id: int {constraint: foreign_key}
-  created_at: timestamp
-  updated_at: timestamp
-}
-
-# Expert AI Services 테이블 (전문가가 사용하는 AI 서비스)
-expert_ai_services: {
-  shape: sql_table
-  id: int {constraint: primary_key}
-  expert_id: int {constraint: foreign_key}
+  ai_video_id: int {constraint: foreign_key}
   ai_service_id: int {constraint: foreign_key}
   usage_description: text
+  usage_order: int # 사용 순서
   created_at: timestamp
   updated_at: timestamp
 }
 
-# Content AI Services 테이블 (콘텐츠 제작에 사용된 AI 서비스)
-content_ai_services: {
+# Curation AI Services 테이블 (큐레이션에 포함된 AI 서비스)
+curation_ai_services: {
   shape: sql_table
   id: int {constraint: primary_key}
-  content_id: int {constraint: foreign_key}
+  curation_id: int {constraint: foreign_key}
   ai_service_id: int {constraint: foreign_key}
-  usage_description: text
+  service_order: int # 큐레이션 내 순서
   created_at: timestamp
   updated_at: timestamp
 }
 
-# Matching Requests 테이블 (매칭 요청)
-matching_requests: {
+# User Favorites 테이블 (사용자 즐겨찾기)
+user_favorites: {
   shape: sql_table
   id: int {constraint: primary_key}
-  client_id: int {constraint: foreign_key}
-  expert_id: int {constraint: foreign_key}
-  request_title: varchar(200)
-  request_description: text
-  request_status: varchar(20) # pending, accepted, rejected, completed
-  request_budget: decimal(10,2)
-  request_deadline: date
+  user_id: int {constraint: foreign_key}
+  favorite_type: varchar(20) # ai_service, ai_video, curation
+  favorite_id: int # AI 서비스, AI 영상, 큐레이션 ID
   created_at: timestamp
   updated_at: timestamp
 }
 
-# Reviews 테이블 (리뷰)
-reviews: {
+# AI Service Views 테이블 (AI 서비스 조회 기록)
+ai_service_views: {
   shape: sql_table
   id: int {constraint: primary_key}
-  client_id: int {constraint: foreign_key}
-  expert_id: int {constraint: foreign_key}
-  content_id: int {constraint: foreign_key}
-  rating: int
-  review_text: text
-  review_status: varchar(20) # active, hidden, deleted
-  created_at: timestamp
-  updated_at: timestamp
-}
-
-# Content Views 테이블 (콘텐츠 조회 기록)
-content_views: {
-  shape: sql_table
-  id: int {constraint: primary_key}
-  content_id: int {constraint: foreign_key}
+  ai_service_id: int {constraint: foreign_key}
   user_id: int {constraint: foreign_key}
   view_date: timestamp
   ip_address: varchar(45)
@@ -194,15 +148,64 @@ content_views: {
   created_at: timestamp
 }
 
-# Ranking Weights 테이블 (랭킹 가중치 설정)
-ranking_weights: {
+# AI Video Views 테이블 (AI 영상 조회 기록)
+ai_video_views: {
   shape: sql_table
   id: int {constraint: primary_key}
-  ranking_type: varchar(50) # ai_service, content, expert, category
-  weight_name: varchar(100)
-  weight_value: decimal(5,3)
-  weight_description: text
-  is_active: boolean
+  ai_video_id: int {constraint: foreign_key}
+  user_id: int {constraint: foreign_key}
+  view_date: timestamp
+  ip_address: varchar(45)
+  user_agent: text
+  created_at: timestamp
+}
+
+# Reviews 테이블 (리뷰)
+reviews: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  user_id: int {constraint: foreign_key}
+  review_type: varchar(20) # ai_service, ai_video
+  review_target_id: int # AI 서비스 또는 AI 영상 ID
+  rating: int # 1-5
+  review_text: text
+  review_status: varchar(20) # active, hidden, deleted
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# AI Service Contents 테이블 (AI 서비스 콘텐츠)
+ai_service_contents: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  ai_service_id: int {constraint: foreign_key}
+  content_type: varchar(50) # target_users, main_features, use_cases
+  content_title: varchar(200)
+  content_text: text
+  content_order: int
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# AI Service SNS 테이블 (AI 서비스 SNS)
+ai_service_sns: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  ai_service_id: int {constraint: foreign_key}
+  sns_type: varchar(50) # twitter, facebook, instagram, youtube, linkedin, etc.
+  sns_url: varchar(500)
+  sns_order: int
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# AI Service Similar Services 테이블 (유사 서비스)
+ai_service_similar_services: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  ai_service_id: int {constraint: foreign_key}
+  similar_service_id: int {constraint: foreign_key}
+  similarity_reason: text
   created_at: timestamp
   updated_at: timestamp
 }
@@ -211,12 +214,12 @@ ranking_weights: {
 rankings: {
   shape: sql_table
   id: int {constraint: primary_key}
-  ranking_type: varchar(50) # ai_service, content, expert, category
+  ranking_type: varchar(50) # ai_service, ai_video, category, curation
   entity_id: int
-  entity_type: varchar(50) # ai_service_id, content_id, expert_id, category_id
+  entity_type: varchar(50) # ai_service_id, ai_video_id, category_id, curation_id
   total_score: decimal(10,3)
   view_count: int
-  request_count: int
+  favorite_count: int
   avg_rating: decimal(3,2)
   ranking_date: date
   created_at: timestamp
@@ -224,22 +227,22 @@ rankings: {
 }
 
 # 관계 정의
-users -> experts
-groups -> experts
-experts -> expert_contents
-contents -> expert_contents
-contents -> content_category_relations
-content_categories -> content_category_relations
-contents -> content_tag_relations
-content_tags -> content_tag_relations
-experts -> expert_ai_services
-ai_services -> expert_ai_services
-contents -> content_ai_services
-ai_services -> content_ai_services
-users -> matching_requests
-experts -> matching_requests
+categories -> categories # 자기 참조 (parent_id)
+ai_services -> ai_service_categories
+categories -> ai_service_categories
+ai_services -> ai_service_contents
+ai_services -> ai_service_sns
+ai_services -> ai_service_similar_services
+ai_services -> ai_service_similar_services # similar_service_id
+ai_videos -> ai_video_categories
+categories -> ai_video_categories
+ai_videos -> ai_video_services
+ai_services -> ai_video_services
+curations -> curation_ai_services
+ai_services -> curation_ai_services
+users -> user_favorites
+ai_services -> ai_service_views
+users -> ai_service_views
+ai_videos -> ai_video_views
+users -> ai_video_views
 users -> reviews
-experts -> reviews
-contents -> reviews
-contents -> content_views
-users -> content_views

@@ -1,363 +1,148 @@
 import express from 'express';
-import userService from '../services/userService';
-import { UserCreateRequest, UserUpdateRequest, UserFilters, PaginationParams } from '../types/database';
+import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { getDatabaseConnection } from '../configs/database';
 
 const router = express.Router();
 
-/**
- * @swagger
- * tags:
- *   name: Users
- *   description: 사용자 관리 API
- */
+// 사용자 목록 조회
+router.get('/', async (req, res) => {
+  try {
+    const page = parseInt(req.query['page'] as string) || 1;
+    const limit = parseInt(req.query['limit'] as string) || 10;
+    const search = req.query['search'] as string;
+    const user_type = req.query['user_type'] as string;
+    const user_status = req.query['user_status'] as string;
 
-/**
- * @swagger
- * /api/users:
- *   post:
- *     summary: 사용자 생성
- *     tags: [Users]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               username:
- *                 type: string
- *                 description: 사용자명
- *               email:
- *                 type: string
- *                 description: 이메일
- *               password:
- *                 type: string
- *                 description: 비밀번호
- *               user_type:
- *                 type: string
- *                 enum: [client, expert, admin]
- *                 description: 사용자 타입
- *             required:
- *               - username
- *               - email
- *               - password
- *     responses:
- *       201:
- *         description: 사용자가 성공적으로 생성됨
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- *       400:
- *         description: 잘못된 요청
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- *       500:
- *         description: 서버 오류
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- */
+    const pool = getDatabaseConnection();
+    const connection = await pool.getConnection();
+    
+    try {
+      const offset = (page - 1) * limit;
+      const whereConditions: string[] = ['deleted_at IS NULL'];
+      const queryParams: any[] = [];
+
+      if (search) {
+        whereConditions.push('(username LIKE ? OR email LIKE ?)');
+        queryParams.push(`%${search}%`, `%${search}%`);
+      }
+
+      if (user_type) {
+        whereConditions.push('user_type = ?');
+        queryParams.push(user_type);
+      }
+
+      if (user_status) {
+        whereConditions.push('user_status = ?');
+        queryParams.push(user_status);
+      }
+
+      const whereClause = whereConditions.join(' AND ');
+
+      // 전체 개수 조회
+      const [countResult] = await connection.execute<RowDataPacket[]>(
+        `SELECT COUNT(*) as total FROM users WHERE ${whereClause}`,
+        queryParams
+      );
+
+      const total = countResult[0].total;
+      const totalPages = Math.ceil(total / limit);
+
+      // 사용자 목록 조회 (비밀번호 제외)
+      const [users] = await connection.execute<RowDataPacket[]>(
+        `SELECT id, username, email, user_type, user_status, created_at, updated_at 
+         FROM users WHERE ${whereClause} 
+         ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+        [...queryParams, limit, offset]
+      );
+
+      res.json({
+        success: true,
+        data: {
+          data: users,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages
+          }
+        }
+      });
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({
+      success: false,
+      error: '사용자 조회 중 오류가 발생했습니다.'
+    });
+  }
+});
+
+// 사용자 생성
 router.post('/', async (req, res) => {
   try {
-    const userData: UserCreateRequest = req.body;
-    
-    // 필수 필드 검증
-    if (!userData.username || !userData.email || !userData.password) {
+    const { 
+      username, 
+      email, 
+      password_hash, 
+      user_type = 'member',
+      user_status = 'active'
+    } = req.body;
+
+    if (!username || !email || !password_hash) {
       return res.status(400).json({
         success: false,
         error: '사용자명, 이메일, 비밀번호는 필수입니다.'
       });
     }
 
-    const result = await userService.createUser(userData);
+    const pool = getDatabaseConnection();
+    const connection = await pool.getConnection();
     
-    if (result.success) {
-      return res.status(201).json(result);
-    } else {
-      return res.status(400).json(result);
-    }
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      error: '서버 오류가 발생했습니다.'
-    });
-  }
-});
+    try {
+      // 이메일 중복 확인
+      const [existingUsers] = await connection.execute<RowDataPacket[]>(
+        'SELECT id FROM users WHERE email = ?',
+        [email]
+      );
 
-/**
- * @swagger
- * /api/users/{id}:
- *   get:
- *     summary: ID로 사용자 조회
- *     tags: [Users]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: 사용자 ID
- *     responses:
- *       200:
- *         description: 사용자 정보 조회 성공
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- *       400:
- *         description: 잘못된 요청
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- *       404:
- *         description: 사용자를 찾을 수 없음
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- *       500:
- *         description: 서버 오류
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- */
-router.get('/:id', async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    
-    if (isNaN(id)) {
-      return res.status(400).json({
-        success: false,
-        error: '유효하지 않은 ID입니다.'
+      if (existingUsers.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: '이미 존재하는 이메일입니다.'
+        });
+      }
+
+      const [result] = await connection.execute<ResultSetHeader>(
+        `INSERT INTO users (username, email, password_hash, user_type, user_status) 
+         VALUES (?, ?, ?, ?, ?)`,
+        [username, email, password_hash, user_type, user_status]
+      );
+
+      res.status(201).json({
+        success: true,
+        data: { id: result.insertId },
+        message: '사용자가 생성되었습니다.'
       });
-    }
-
-    const result = await userService.getUserById(id);
-    
-    if (result.success) {
-      return res.json(result);
-    } else {
-      return res.status(404).json(result);
+    } finally {
+      connection.release();
     }
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      error: '서버 오류가 발생했습니다.'
-    });
-  }
-});
-
-/**
- * @swagger
- * /api/users:
- *   get:
- *     summary: 사용자 목록 조회
- *     tags: [Users]
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: 페이지 번호
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: 페이지당 항목 수
- *       - in: query
- *         name: user_type
- *         schema:
- *           type: string
- *           enum: [client, expert, admin]
- *         description: 사용자 타입 필터
- *       - in: query
- *         name: user_status
- *         schema:
- *           type: string
- *           enum: [active, inactive, pending, deleted]
- *         description: 사용자 상태 필터
- *     responses:
- *       200:
- *         description: 사용자 목록 조회 성공
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/ApiResponse'
- *                 - $ref: '#/components/schemas/PaginatedResponse'
- *       400:
- *         description: 잘못된 요청
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- *       500:
- *         description: 서버 오류
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- */
-router.get('/', async (req, res) => {
-  try {
-    const page = parseInt(req.query['page'] as string) || 1;
-    const limit = parseInt(req.query['limit'] as string) || 10;
-    const user_type = req.query['user_type'] as string;
-    const user_status = req.query['user_status'] as string;
-
-    const params: PaginationParams = { page, limit };
-    const filters: UserFilters = {};
-    
-    if (user_type) filters.user_type = user_type;
-    if (user_status) filters.user_status = user_status;
-
-    const result = await userService.getUsers(params, filters);
-    
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(400).json(result);
-    }
-  } catch (error) {
+    console.error('Error creating user:', error);
     res.status(500).json({
       success: false,
-      error: '서버 오류가 발생했습니다.'
+      error: '사용자 생성 중 오류가 발생했습니다.'
     });
   }
 });
 
-/**
- * @swagger
- * /api/users/search:
- *   get:
- *     summary: 사용자 검색
- *     tags: [Users]
- *     parameters:
- *       - in: query
- *         name: q
- *         required: true
- *         schema:
- *           type: string
- *         description: 검색어
- *     responses:
- *       200:
- *         description: 사용자 검색 성공
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- *       400:
- *         description: 잘못된 요청
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- *       500:
- *         description: 서버 오류
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- */
-router.get('/search', async (req, res) => {
-  try {
-    const searchTerm = req.query['q'] as string;
-    
-    if (!searchTerm) {
-      return res.status(400).json({
-        success: false,
-        error: '검색어가 필요합니다.'
-      });
-    }
-
-    const result = await userService.searchUsers(searchTerm);
-    
-    if (result.success) {
-      return res.json(result);
-    } else {
-      return res.status(400).json(result);
-    }
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      error: '서버 오류가 발생했습니다.'
-    });
-  }
-});
-
-/**
- * @swagger
- * /api/users/{id}:
- *   put:
- *     summary: 사용자 정보 수정
- *     tags: [Users]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: 사용자 ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               username:
- *                 type: string
- *                 description: 사용자명
- *               email:
- *                 type: string
- *                 description: 이메일
- *               user_type:
- *                 type: string
- *                 enum: [client, expert, admin]
- *                 description: 사용자 타입
- *               user_status:
- *                 type: string
- *                 enum: [active, inactive, pending, deleted]
- *                 description: 사용자 상태
- *     responses:
- *       200:
- *         description: 사용자 정보 수정 성공
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- *       400:
- *         description: 잘못된 요청
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- *       404:
- *         description: 사용자를 찾을 수 없음
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- *       500:
- *         description: 서버 오류
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- */
+// 사용자 수정
 router.put('/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const userData: UserUpdateRequest = req.body;
-    
+    const { username, email, user_type, user_status } = req.body;
+
     if (isNaN(id)) {
       return res.status(400).json({
         success: false,
@@ -365,64 +150,78 @@ router.put('/:id', async (req, res) => {
       });
     }
 
-    const result = await userService.updateUser(id, userData);
+    const pool = getDatabaseConnection();
+    const connection = await pool.getConnection();
     
-    if (result.success) {
-      return res.json(result);
-    } else {
-      return res.status(404).json(result);
+    try {
+      // 사용자 존재 확인
+      const [existingUsers] = await connection.execute<RowDataPacket[]>(
+        'SELECT id FROM users WHERE id = ? AND deleted_at IS NULL',
+        [id]
+      );
+
+      if (existingUsers.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: '사용자를 찾을 수 없습니다.'
+        });
+      }
+
+      // 이메일 중복 확인 (다른 사용자)
+      if (email) {
+        const [duplicateUsers] = await connection.execute<RowDataPacket[]>(
+          'SELECT id FROM users WHERE email = ? AND id != ?',
+          [email, id]
+        );
+
+        if (duplicateUsers.length > 0) {
+          return res.status(400).json({
+            success: false,
+            error: '이미 존재하는 이메일입니다.'
+          });
+        }
+      }
+
+      const updateFields: string[] = [];
+      const updateParams: any[] = [];
+
+      const fieldsToUpdate = ['username', 'email', 'user_type', 'user_status'];
+
+      fieldsToUpdate.forEach(field => {
+        if (req.body[field] !== undefined) {
+          updateFields.push(`${field} = ?`);
+          updateParams.push(req.body[field]);
+        }
+      });
+
+      if (updateFields.length > 0) {
+        await connection.execute(
+          `UPDATE users SET ${updateFields.join(', ')}, updated_at = NOW() WHERE id = ?`,
+          [...updateParams, id]
+        );
+      }
+
+      res.json({
+        success: true,
+        message: '사용자 정보가 수정되었습니다.'
+      });
+    } finally {
+      connection.release();
     }
   } catch (error) {
-    return res.status(500).json({
+    console.error('Error updating user:', error);
+    res.status(500).json({
       success: false,
-      error: '서버 오류가 발생했습니다.'
+      error: '사용자 수정 중 오류가 발생했습니다.'
     });
   }
 });
 
-/**
- * @swagger
- * /api/users/{id}:
- *   delete:
- *     summary: 사용자 삭제 (소프트 삭제)
- *     tags: [Users]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: 사용자 ID
- *     responses:
- *       200:
- *         description: 사용자 삭제 성공
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- *       400:
- *         description: 잘못된 요청
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- *       404:
- *         description: 사용자를 찾을 수 없음
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- *       500:
- *         description: 서버 오류
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- */
+// 사용자 삭제
 router.delete('/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    
+
     if (isNaN(id)) {
       return res.status(400).json({
         success: false,
@@ -430,62 +229,36 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    const result = await userService.deleteUser(id);
+    const pool = getDatabaseConnection();
+    const connection = await pool.getConnection();
     
-    if (result.success) {
-      return res.json(result);
-    } else {
-      return res.status(404).json(result);
-    }
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      error: '서버 오류가 발생했습니다.'
-    });
-  }
-});
+    try {
+      const [result] = await connection.execute<ResultSetHeader>(
+        'UPDATE users SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL',
+        [id]
+      );
 
-/**
- * @swagger
- * /api/users/stats/overview:
- *   get:
- *     summary: 사용자 통계 조회
- *     tags: [Users]
- *     responses:
- *       200:
- *         description: 사용자 통계 조회 성공
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- *       400:
- *         description: 잘못된 요청
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- *       500:
- *         description: 서버 오류
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ApiResponse'
- */
-router.get('/stats/overview', async (_req, res) => {
-  try {
-    const result = await userService.getUserStats();
-    
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(400).json(result);
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          success: false,
+          error: '사용자를 찾을 수 없습니다.'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: '사용자가 삭제되었습니다.'
+      });
+    } finally {
+      connection.release();
     }
   } catch (error) {
+    console.error('Error deleting user:', error);
     res.status(500).json({
       success: false,
-      error: '서버 오류가 발생했습니다.'
+      error: '사용자 삭제 중 오류가 발생했습니다.'
     });
   }
 });
 
-export default router; 
+export default router;

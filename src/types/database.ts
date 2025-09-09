@@ -1,4 +1,4 @@
-// StepAI API Database Types - AI 전문가 매칭 서비스
+// StepAI API Database Types - AI 서비스 소개 및 이용방법 추천 서비스
 
 // 기본 타입들
 export interface User {
@@ -6,41 +6,8 @@ export interface User {
   username: string;
   email: string;
   password_hash: string;
-  user_type: 'client' | 'expert' | 'admin';
+  user_type: 'member' | 'admin';
   user_status: 'active' | 'inactive' | 'pending' | 'deleted';
-  deleted_at?: Date;
-  created_at: Date;
-  updated_at: Date;
-}
-
-export interface Group {
-  id: number;
-  group_name: string;
-  group_description?: string;
-  group_logo?: string;
-  group_website?: string;
-  group_email?: string;
-  group_phone?: string;
-  group_address?: string;
-  group_status: 'active' | 'inactive' | 'pending' | 'deleted';
-  deleted_at?: Date;
-  created_at: Date;
-  updated_at: Date;
-}
-
-export interface Expert {
-  id: number;
-  user_id: number;
-  group_id?: number;
-  expert_name: string;
-  expert_title?: string;
-  expert_bio?: string;
-  expert_avatar?: string;
-  expert_website?: string;
-  expert_email?: string;
-  expert_phone?: string;
-  expert_location?: string;
-  expert_status: 'active' | 'inactive' | 'pending' | 'deleted';
   deleted_at?: Date;
   created_at: Date;
   updated_at: Date;
@@ -50,107 +17,147 @@ export interface AIService {
   id: number;
   ai_name: string;
   ai_description?: string;
-  ai_type: string;
+  ai_type: string; // LLM, RAG, GPTs, Image_Generation, Video_Generation, etc.
+  ai_website?: string;
+  ai_logo?: string;
+  pricing_model?: 'free' | 'freemium' | 'paid' | 'subscription';
+  pricing_info?: string;
+  difficulty_level: 'beginner' | 'intermediate' | 'advanced';
   ai_status: 'active' | 'inactive' | 'pending' | 'deleted';
+  is_visible: boolean; // 사이트 노출여부
+  is_step_pick: boolean; // Step Pick 여부
   nationality?: string;
   deleted_at?: Date;
   created_at: Date;
   updated_at: Date;
 }
 
-export interface Content {
+export interface AIVideo {
   id: number;
-  content_title: string;
-  content_description?: string;
-  content_url?: string;
-  content_type: string;
-  content_order_index: number;
-  content_status: 'active' | 'inactive' | 'pending' | 'deleted';
+  video_title: string;
+  video_description?: string;
+  video_url: string;
+  thumbnail_url?: string;
+  duration: number; // 초 단위
+  video_status: 'active' | 'inactive' | 'pending' | 'deleted';
+  view_count: number;
+  like_count: number;
   deleted_at?: Date;
   created_at: Date;
   updated_at: Date;
 }
 
-export interface ContentCategory {
+export interface Category {
   id: number;
   category_name: string;
-  category_icon?: string;
   category_description?: string;
+  category_icon?: string;
+  parent_id?: number; // NULL이면 메인 카테고리
+  category_order: number;
+  category_status: 'active' | 'inactive';
   created_at: Date;
   updated_at: Date;
 }
 
-export interface ContentTag {
+export interface Curation {
   id: number;
-  tag_name: string;
-  tag_description?: string;
+  curation_title: string;
+  curation_description?: string;
+  curation_thumbnail?: string;
+  curation_order: number;
+  curation_status: 'active' | 'inactive' | 'pending' | 'deleted';
+  deleted_at?: Date;
   created_at: Date;
   updated_at: Date;
 }
 
-export interface ExpertContent {
+// 관계 테이블 타입들
+export interface AIServiceCategory {
   id: number;
-  expert_id: number;
-  content_id: number;
-  created_at: Date;
-  updated_at: Date;
-}
-
-export interface ContentCategoryRelation {
-  id: number;
-  content_id: number;
+  ai_service_id: number;
   category_id: number;
   created_at: Date;
   updated_at: Date;
 }
 
-export interface ContentTagRelation {
+export interface AIVideoCategory {
   id: number;
-  content_id: number;
-  tag_id: number;
+  ai_video_id: number;
+  category_id: number;
   created_at: Date;
   updated_at: Date;
 }
 
-export interface ExpertAIService {
+export interface AIVideoService {
   id: number;
-  expert_id: number;
+  ai_video_id: number;
   ai_service_id: number;
   usage_description?: string;
+  usage_order: number;
   created_at: Date;
   updated_at: Date;
 }
 
-export interface ContentAIService {
+export interface CurationAIService {
   id: number;
-  content_id: number;
+  curation_id: number;
   ai_service_id: number;
-  usage_description?: string;
+  service_order: number;
   created_at: Date;
   updated_at: Date;
 }
 
-export interface MatchingRequest {
+export interface UserFavorite {
   id: number;
-  client_id: number;
-  expert_id: number;
-  request_title: string;
-  request_description?: string;
-  request_status: 'pending' | 'accepted' | 'rejected' | 'completed';
-  request_budget?: number;
-  request_deadline?: Date;
+  user_id: number;
+  favorite_type: 'ai_service' | 'ai_video' | 'curation';
+  favorite_id: number;
   created_at: Date;
   updated_at: Date;
+}
+
+export interface AIServiceView {
+  id: number;
+  ai_service_id: number;
+  user_id?: number;
+  view_date: Date;
+  ip_address?: string;
+  user_agent?: string;
+  created_at: Date;
+}
+
+export interface AIVideoView {
+  id: number;
+  ai_video_id: number;
+  user_id?: number;
+  view_date: Date;
+  ip_address?: string;
+  user_agent?: string;
+  created_at: Date;
 }
 
 export interface Review {
   id: number;
-  client_id: number;
-  expert_id: number;
-  content_id?: number;
-  rating: number;
+  user_id: number;
+  review_type: 'ai_service' | 'ai_video';
+  review_target_id: number;
+  rating: number; // 1-5
   review_text?: string;
   review_status: 'active' | 'hidden' | 'deleted';
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface Ranking {
+  id: number;
+  ranking_type: 'ai_service' | 'ai_video' | 'category' | 'curation';
+  entity_id: number;
+  entity_type: 'ai_service_id' | 'ai_video_id' | 'category_id' | 'curation_id';
+  total_score: number;
+  view_count: number;
+  favorite_count: number;
+  avg_rating: number;
+  ranking_date: Date;
   created_at: Date;
   updated_at: Date;
 }
@@ -183,13 +190,13 @@ export interface UserCreateRequest {
   username: string;
   email: string;
   password: string;
-  user_type?: 'client' | 'expert' | 'admin';
+  user_type?: 'member' | 'admin';
 }
 
 export interface UserUpdateRequest {
   username?: string;
   email?: string;
-  user_type?: 'client' | 'expert' | 'admin';
+  user_type?: 'member' | 'admin';
   user_status?: 'active' | 'inactive' | 'pending' | 'deleted';
 }
 
@@ -198,85 +205,17 @@ export interface UserFilters {
   user_status?: string;
 }
 
-// Groups 관련 타입들
-export interface GroupCreateRequest {
-  group_name: string;
-  group_description?: string;
-  group_logo?: string;
-  group_website?: string;
-  group_email?: string;
-  group_phone?: string;
-  group_address?: string;
-}
-
-export interface GroupUpdateRequest {
-  group_name?: string;
-  group_description?: string;
-  group_logo?: string;
-  group_website?: string;
-  group_email?: string;
-  group_phone?: string;
-  group_address?: string;
-  group_status?: 'active' | 'inactive' | 'pending' | 'deleted';
-}
-
-export interface GroupFilters {
-  group_status?: string;
-}
-
-// Experts 관련 타입들
-export interface ExpertCreateRequest {
-  user_id: number;
-  group_id?: number;
-  expert_name: string;
-  expert_title?: string;
-  expert_bio?: string;
-  expert_avatar?: string;
-  expert_website?: string;
-  expert_email?: string;
-  expert_phone?: string;
-  expert_location?: string;
-}
-
-export interface ExpertUpdateRequest {
-  group_id?: number;
-  expert_name?: string;
-  expert_title?: string;
-  expert_bio?: string;
-  expert_avatar?: string;
-  expert_website?: string;
-  expert_email?: string;
-  expert_phone?: string;
-  expert_location?: string;
-  expert_status?: 'active' | 'inactive' | 'pending' | 'deleted';
-}
-
-export interface ExpertFilters {
-  expert_status?: string;
-  expert_location?: string;
-  group_id?: number;
-}
-
-export interface ExpertListOptions {
-  include_user?: boolean;
-  include_group?: boolean;
-  include_contents?: boolean;
-  include_ai_services?: boolean;
-}
-
-export interface ExpertWithRelations extends Expert {
-  user?: User;
-  group?: Group;
-  contents?: Content[];
-  ai_services?: AIService[];
-}
-
-// AIServices 관련 타입들
+// AI Services 관련 타입들
 export interface AIServiceCreateRequest {
   ai_name: string;
   ai_description?: string;
   ai_type: string;
+  ai_website?: string;
+  ai_logo?: string;
+  pricing_model?: 'free' | 'freemium' | 'paid' | 'subscription';
+  pricing_info?: string;
   ai_status?: 'active' | 'inactive' | 'pending' | 'deleted';
+  is_visible?: boolean;
   nationality?: string;
   category_ids?: number[];
 }
@@ -285,7 +224,12 @@ export interface AIServiceUpdateRequest {
   ai_name?: string;
   ai_description?: string;
   ai_type?: string;
+  ai_website?: string;
+  ai_logo?: string;
+  pricing_model?: 'free' | 'freemium' | 'paid' | 'subscription';
+  pricing_info?: string;
   ai_status?: 'active' | 'inactive' | 'pending' | 'deleted';
+  is_visible?: boolean;
   nationality?: string;
 }
 
@@ -294,111 +238,120 @@ export interface AIServiceFilters {
   ai_type?: string;
   nationality?: string;
   category_id?: number;
+  pricing_model?: string;
+  is_visible?: boolean;
 }
 
 export interface AIServiceListOptions {
-  include_contents?: boolean;
-  include_tags?: boolean;
   include_categories?: boolean;
-  include_companies?: boolean;
+  include_videos?: boolean;
+  include_curations?: boolean;
 }
 
-// Contents 관련 타입들
-export interface ContentCreateRequest {
-  content_title: string;
-  content_description?: string;
-  content_url?: string;
-  content_type: string;
-  content_order_index?: number;
+export interface AIServiceWithRelations extends AIService {
+  categories?: Category[];
+  videos?: AIVideo[];
+  curations?: Curation[];
+}
+
+// AI Videos 관련 타입들
+export interface AIVideoCreateRequest {
+  video_title: string;
+  video_description?: string;
+  video_url: string;
+  thumbnail_url?: string;
+  duration?: number;
+  video_status?: 'active' | 'inactive' | 'pending' | 'deleted';
   category_ids?: number[];
-  tag_ids?: number[];
   ai_service_ids?: number[];
 }
 
-export interface ContentUpdateRequest {
-  content_title?: string;
-  content_description?: string;
-  content_url?: string;
-  content_type?: string;
-  content_order_index?: number;
-  content_status?: 'active' | 'inactive' | 'pending' | 'deleted';
+export interface AIVideoUpdateRequest {
+  video_title?: string;
+  video_description?: string;
+  video_url?: string;
+  thumbnail_url?: string;
+  duration?: number;
+  video_status?: 'active' | 'inactive' | 'pending' | 'deleted';
 }
 
-export interface ContentFilters {
-  content_status?: string;
-  content_type?: string;
+export interface AIVideoFilters {
+  video_status?: string;
   category_id?: number;
-  tag_id?: number;
   ai_service_id?: number;
 }
 
-export interface ContentListOptions {
+export interface AIVideoListOptions {
   include_categories?: boolean;
-  include_tags?: boolean;
   include_ai_services?: boolean;
-  include_experts?: boolean;
 }
 
-export interface ContentWithRelations extends Content {
-  categories?: ContentCategory[];
-  tags?: ContentTag[];
+export interface AIVideoWithRelations extends AIVideo {
+  categories?: Category[];
   ai_services?: AIService[];
-  experts?: Expert[];
 }
 
-// ContentCategories 관련 타입들
-export interface ContentCategoryCreateRequest {
+// Categories 관련 타입들
+export interface CategoryCreateRequest {
   category_name: string;
-  category_icon?: string;
   category_description?: string;
+  category_icon?: string;
+  parent_id?: number;
+  category_order?: number;
 }
 
-export interface ContentCategoryUpdateRequest {
+export interface CategoryUpdateRequest {
   category_name?: string;
-  category_icon?: string;
   category_description?: string;
+  category_icon?: string;
+  parent_id?: number;
+  category_order?: number;
+  category_status?: 'active' | 'inactive';
 }
 
-// ContentTags 관련 타입들
-export interface ContentTagCreateRequest {
-  tag_name: string;
-  tag_description?: string;
+export interface CategoryFilters {
+  category_status?: string;
+  parent_id?: number;
 }
 
-export interface ContentTagUpdateRequest {
-  tag_name?: string;
-  tag_description?: string;
+export interface CategoryWithChildren extends Category {
+  children?: Category[];
 }
 
-// MatchingRequests 관련 타입들
-export interface MatchingRequestCreateRequest {
-  client_id: number;
-  expert_id: number;
-  request_title: string;
-  request_description?: string;
-  request_budget?: number;
-  request_deadline?: Date;
+// Curations 관련 타입들
+export interface CurationCreateRequest {
+  curation_title: string;
+  curation_description?: string;
+  curation_thumbnail?: string;
+  curation_order?: number;
+  ai_service_ids?: number[];
 }
 
-export interface MatchingRequestUpdateRequest {
-  request_title?: string;
-  request_description?: string;
-  request_status?: 'pending' | 'accepted' | 'rejected' | 'completed';
-  request_budget?: number;
-  request_deadline?: Date;
+export interface CurationUpdateRequest {
+  curation_title?: string;
+  curation_description?: string;
+  curation_thumbnail?: string;
+  curation_order?: number;
+  curation_status?: 'active' | 'inactive' | 'pending' | 'deleted';
 }
 
-export interface MatchingRequestFilters {
-  request_status?: string;
-  client_id?: number;
-  expert_id?: number;
+export interface CurationFilters {
+  curation_status?: string;
+}
+
+export interface CurationListOptions {
+  include_ai_services?: boolean;
+}
+
+export interface CurationWithRelations extends Curation {
+  ai_services?: AIService[];
 }
 
 // Reviews 관련 타입들
 export interface ReviewCreateRequest {
-  client_id: number;
-  expert_id: number;
-  content_id?: number;
+  user_id: number;
+  review_type: 'ai_service' | 'ai_video';
+  review_target_id: number;
   rating: number;
   review_text?: string;
 }
@@ -411,86 +364,114 @@ export interface ReviewUpdateRequest {
 
 export interface ReviewFilters {
   review_status?: string;
-  client_id?: number;
-  expert_id?: number;
-  content_id?: number;
+  review_type?: string;
+  review_target_id?: number;
+  user_id?: number;
   rating?: number;
-} 
+}
+
+// User Favorites 관련 타입들
+export interface UserFavoriteCreateRequest {
+  user_id: number;
+  favorite_type: 'ai_service' | 'ai_video' | 'curation';
+  favorite_id: number;
+}
+
+export interface UserFavoriteFilters {
+  user_id?: number;
+  favorite_type?: string;
+}
 
 // 랭킹 관련 타입들
-export interface ContentView {
-  id: number;
-  content_id: number;
-  user_id?: number;
-  view_date: Date;
-  ip_address?: string;
-  user_agent?: string;
-  created_at: Date;
-}
-
-export interface RankingWeight {
-  id: number;
-  ranking_type: 'ai_service' | 'content' | 'expert' | 'category';
-  weight_name: string;
-  weight_value: number;
-  weight_description?: string;
-  is_active: boolean;
-  created_at: Date;
-  updated_at: Date;
-}
-
-export interface Ranking {
-  id: number;
-  ranking_type: 'ai_service' | 'content' | 'expert' | 'category';
-  entity_id: number;
-  entity_type: 'ai_service_id' | 'content_id' | 'expert_id' | 'category_id';
-  total_score: number;
-  view_count: number;
-  request_count: number;
-  avg_rating: number;
-  ranking_date: Date;
-  created_at: Date;
-  updated_at: Date;
-}
-
 export interface RankingResult {
   entity_id: number;
   entity_name: string;
   total_score: number;
   view_count: number;
-  request_count: number;
+  favorite_count: number;
   avg_rating: number;
   rank: number;
 }
 
 export interface RankingFilters {
-  ranking_type?: 'ai_service' | 'content' | 'expert' | 'category';
+  ranking_type?: 'ai_service' | 'ai_video' | 'category' | 'curation';
   date_from?: Date;
   date_to?: Date;
   limit?: number;
 }
 
-export interface RankingWeightUpdate {
-  ranking_type: 'ai_service' | 'content' | 'expert' | 'category';
-  weight_name: string;
-  weight_value: number;
-  weight_description?: string;
+// 조회 기록 관련 타입들
+export interface ViewRecordRequest {
+  user_id?: number;
+  ip_address?: string;
+  user_agent?: string;
 }
 
-// 랭킹 계산을 위한 데이터 구조
-export interface RankingData {
-  entity_id: number;
-  entity_name: string;
-  view_count: number;
-  request_count: number;
+// 통계 관련 타입들
+export interface ServiceStats {
+  total_ai_services: number;
+  total_ai_videos: number;
+  total_curations: number;
+  total_categories: number;
+  total_users: number;
+  total_reviews: number;
   avg_rating: number;
-  content_count?: number;
 }
 
-// 랭킹 API 응답 타입
-export interface RankingApiResponse {
+// 검색 관련 타입들
+export interface SearchFilters {
+  query?: string;
+  category_id?: number;
+  ai_type?: string;
+  pricing_model?: string;
+}
+
+export interface SearchResult {
+  ai_services: AIService[];
+  ai_videos: AIVideo[];
+  curations: Curation[];
+}
+
+// AI 서비스 관련 추가 타입들
+export interface AIServiceContent {
+  id: number;
+  ai_service_id: number;
+  content_type: 'target_users' | 'main_features' | 'use_cases';
+  content_title?: string;
+  content_text?: string;
+  content_order: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface AIServiceSNS {
+  id: number;
+  ai_service_id: number;
+  sns_type: string;
+  sns_url: string;
+  sns_order: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface AIServiceSimilarService {
+  id: number;
+  ai_service_id: number;
+  similar_service_id: number;
+  similarity_reason?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// 파일 업로드 관련 타입들
+export interface FileUploadResponse {
   success: boolean;
-  data?: RankingResult[];
+  data?: {
+    filename: string;
+    originalName: string;
+    size: number;
+    url: string;
+    type: string;
+  };
   error?: string;
-  message?: string;
-} 
+}

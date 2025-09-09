@@ -1,8 +1,20 @@
+import dotenv from 'dotenv';
+import path from 'path';
+
+// .env 파일 경로 명시적으로 지정
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
 import mysql from 'mysql2/promise';
 
-// 환경별 데이터베이스 설정
-const dbConfigs = {
-  development: {
+// 데이터베이스 설정 (환경변수 기반)
+const getDbConfig = () => {
+  console.log('Environment variables:');
+  console.log('DB_HOST:', process.env['DB_HOST']);
+  console.log('DB_PORT:', process.env['DB_PORT']);
+  console.log('DB_USER:', process.env['DB_USER']);
+  console.log('DB_NAME:', process.env['DB_NAME']);
+  
+  return {
     host: process.env['DB_HOST'] || 'localhost',
     port: parseInt(process.env['DB_PORT'] || '3306'),
     user: process.env['DB_USER'] || 'root',
@@ -12,32 +24,8 @@ const dbConfigs = {
     timezone: '+09:00',
     connectionLimit: 10,
     acquireTimeout: 60000,
-    timeout: 60000,
-  },
-  staging: {
-    host: process.env['DB_HOST'] || 'localhost',
-    port: parseInt(process.env['DB_PORT'] || '3306'),
-    user: process.env['DB_USER'] || 'root',
-    password: process.env['DB_PASSWORD'] || '',
-    database: process.env['DB_NAME'] || 'stepai_staging',
-    charset: 'utf8mb4',
-    timezone: '+09:00',
-    connectionLimit: 20,
-    acquireTimeout: 60000,
-    timeout: 60000,
-  },
-  production: {
-    host: process.env['DB_HOST'] || 'localhost',
-    port: parseInt(process.env['DB_PORT'] || '3306'),
-    user: process.env['DB_USER'] || 'root',
-    password: process.env['DB_PASSWORD'] || '',
-    database: process.env['DB_NAME'] || 'stepai_prod',
-    charset: 'utf8mb4',
-    timezone: '+09:00',
-    connectionLimit: 50,
-    acquireTimeout: 60000,
-    timeout: 60000,
-  }
+    timeout: 60000
+  };
 };
 
 // 현재 환경 가져오기
@@ -51,9 +39,10 @@ const getCurrentEnv = (): 'development' | 'staging' | 'production' => {
 // 데이터베이스 연결 풀 생성
 const createConnectionPool = () => {
   const currentEnv = getCurrentEnv();
-  const config = dbConfigs[currentEnv];
+  const config = getDbConfig();
   
   console.log(`Database connecting to ${currentEnv} environment`);
+  console.log(`Database config: ${config.host}:${config.port}/${config.database}`);
   
   return mysql.createPool(config);
 };
