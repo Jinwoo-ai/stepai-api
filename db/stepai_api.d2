@@ -226,6 +226,34 @@ rankings: {
   updated_at: timestamp
 }
 
+# Tags 테이블 (태그)
+tags: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  tag_name: varchar(50) {constraint: unique}
+  tag_count: int # 사용 횟수
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+# AI Service Tags 테이블 (AI 서비스-태그 관계)
+ai_service_tags: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  ai_service_id: int {constraint: foreign_key}
+  tag_id: int {constraint: foreign_key}
+  created_at: timestamp
+}
+
+# AI Video Tags 테이블 (AI 영상-태그 관계)
+ai_video_tags: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  ai_video_id: int {constraint: foreign_key}
+  tag_id: int {constraint: foreign_key}
+  created_at: timestamp
+}
+
 # 관계 정의
 categories -> categories # 자기 참조 (parent_id)
 ai_services -> ai_service_categories
@@ -246,3 +274,7 @@ users -> ai_service_views
 ai_videos -> ai_video_views
 users -> ai_video_views
 users -> reviews
+tags -> ai_service_tags
+ai_services -> ai_service_tags
+tags -> ai_video_tags
+ai_videos -> ai_video_tags

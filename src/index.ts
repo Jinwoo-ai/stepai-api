@@ -16,6 +16,8 @@ import dashboardRouter from './routes/dashboard';
 import curationsRouter from './routes/curations';
 import usersRouter from './routes/users';
 import siteSettingsRouter from './routes/siteSettings';
+import tagsRouter from './routes/tags';
+import aiTypesRouter from './routes/aiTypes';
 
 const app = express();
 const PORT = parseInt(process.env['PORT'] || '3004');
@@ -116,6 +118,8 @@ app.use('/api/dashboard', dashboardRouter);
 app.use('/api/curations', curationsRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/site-settings', siteSettingsRouter);
+app.use('/api/tags', tagsRouter);
+app.use('/api/ai-types', aiTypesRouter);
 
 // 헬스체크 엔드포인트
 app.get('/health', async (_req, res) => {
@@ -150,7 +154,8 @@ app.get('/', (_req, res) => {
       dashboard: '/api/dashboard',
       curations: '/api/curations',
       users: '/api/users',
-      siteSettings: '/api/site-settings'
+      siteSettings: '/api/site-settings',
+      tags: '/api/tags'
     }
   });
 });

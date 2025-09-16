@@ -17,18 +17,25 @@ CREATE TABLE users (
 -- AI Services 테이블 (AI 서비스)
 CREATE TABLE ai_services (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  ai_name VARCHAR(100) NOT NULL,
-  ai_description TEXT,
-  ai_type VARCHAR(255) NOT NULL, -- LLM, RAG, GPTs, Image_Generation, Video_Generation, etc.
-  ai_website VARCHAR(255),
-  ai_logo VARCHAR(255),
-  pricing_model VARCHAR(50), -- free, freemium, paid, subscription
+  ai_name VARCHAR(100) NOT NULL, -- 서비스명(국문)
+  ai_name_en VARCHAR(100), -- 서비스명(영문)
+  ai_description TEXT, -- 한줄설명
+  ai_website VARCHAR(255), -- 대표 URL
+  ai_logo VARCHAR(255), -- 로고(URL)
+  company_name VARCHAR(100), -- 기업명(국문)
+  company_name_en VARCHAR(100), -- 기업명(영문)
+  embedded_video_url VARCHAR(500), -- 임베디드 영상 URL
+  headquarters VARCHAR(50), -- 본사
+  main_features TEXT, -- 주요기능
+  target_users TEXT, -- 타겟 사용자
+  use_cases TEXT, -- 추천활용사례
   pricing_info TEXT,
-  difficulty_level VARCHAR(20) DEFAULT 'beginner', -- beginner, intermediate, advanced
-  ai_status VARCHAR(20) DEFAULT 'active', -- active, inactive, pending, deleted
-  is_visible BOOLEAN DEFAULT TRUE, -- 사이트 노출여부
-  is_step_pick BOOLEAN DEFAULT FALSE, -- Step Pick 여부
-  nationality VARCHAR(20),
+  difficulty_level VARCHAR(20) DEFAULT 'beginner', -- 난이도
+  usage_availability VARCHAR(10), -- 사용 (가능, 불가능)
+  ai_status VARCHAR(20) DEFAULT 'active',
+  is_visible BOOLEAN DEFAULT TRUE, -- Alive (Yes/No)
+  is_step_pick BOOLEAN DEFAULT FALSE, -- 표시위치 (STEP_PICK)
+  nationality VARCHAR(20), -- 본사 (deprecated, use headquarters)
   deleted_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -59,6 +66,7 @@ CREATE TABLE categories (
   category_icon VARCHAR(255),
   parent_id INT NULL, -- 부모 카테고리 ID (NULL이면 메인 카테고리)
   category_order INT DEFAULT 0,
+  priority INT DEFAULT 0, -- 우선순위 (높을수록 상단 고정)
   category_status VARCHAR(20) DEFAULT 'active', -- active, inactive
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -74,6 +82,15 @@ CREATE TABLE curations (
   curation_order INT DEFAULT 0,
   curation_status VARCHAR(20) DEFAULT 'active', -- active, inactive, pending, deleted
   deleted_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Tags 테이블 (태그)
+CREATE TABLE tags (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  tag_name VARCHAR(50) UNIQUE NOT NULL,
+  tag_count INT DEFAULT 0, -- 사용 횟수
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -101,6 +118,28 @@ CREATE TABLE ai_video_categories (
   FOREIGN KEY (ai_video_id) REFERENCES ai_videos(id) ON DELETE CASCADE,
   FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE,
   UNIQUE KEY unique_ai_video_category (ai_video_id, category_id)
+);
+
+-- AI Service Tags 테이블 (AI 서비스-태그 관계)
+CREATE TABLE ai_service_tags (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ai_service_id INT NOT NULL,
+  tag_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
+  FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_ai_service_tag (ai_service_id, tag_id)
+);
+
+-- AI Video Tags 테이블 (AI 영상-태그 관계)
+CREATE TABLE ai_video_tags (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ai_video_id INT NOT NULL,
+  tag_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (ai_video_id) REFERENCES ai_videos(id) ON DELETE CASCADE,
+  FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_ai_video_tag (ai_video_id, tag_id)
 );
 
 -- AI Video Services 테이블 (AI 영상에서 사용된 AI 서비스)
@@ -208,6 +247,67 @@ CREATE TABLE ai_service_sns (
   FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE
 );
 
+-- AI Types 테이블 (AI 형태)
+CREATE TABLE ai_types (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  type_name VARCHAR(50) NOT NULL UNIQUE, -- WEB, MOB, DES, EXT, API
+  type_description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Pricing Models 테이블 (가격 모델)
+CREATE TABLE pricing_models (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  model_name VARCHAR(50) NOT NULL UNIQUE, -- 유료, 무료, 프리미엄 등
+  model_description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Target Types 테이블 (타겟 타입)
+CREATE TABLE target_types (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  type_code VARCHAR(10) NOT NULL UNIQUE, -- B, C, G
+  type_name VARCHAR(50) NOT NULL, -- B2B, B2C, B2G
+  type_description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- AI Service Types 테이블 (AI 서비스-타입 관계)
+CREATE TABLE ai_service_types (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ai_service_id INT NOT NULL,
+  ai_type_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
+  FOREIGN KEY (ai_type_id) REFERENCES ai_types(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_ai_service_type (ai_service_id, ai_type_id)
+);
+
+-- AI Service Pricing Models 테이블 (AI 서비스-가격모델 관계)
+CREATE TABLE ai_service_pricing_models (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ai_service_id INT NOT NULL,
+  pricing_model_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
+  FOREIGN KEY (pricing_model_id) REFERENCES pricing_models(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_ai_service_pricing (ai_service_id, pricing_model_id)
+);
+
+-- AI Service Target Types 테이블 (AI 서비스-타겟타입 관계)
+CREATE TABLE ai_service_target_types (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ai_service_id INT NOT NULL,
+  target_type_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
+  FOREIGN KEY (target_type_id) REFERENCES target_types(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_ai_service_target (ai_service_id, target_type_id)
+);
+
 -- AI Service Similar Services 테이블 (유사 서비스)
 CREATE TABLE ai_service_similar_services (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -227,92 +327,14 @@ CREATE TABLE rankings (
   ranking_type VARCHAR(50) NOT NULL, -- ai_service, ai_video, category, curation
   entity_id INT NOT NULL,
   entity_type VARCHAR(50) NOT NULL, -- ai_service_id, ai_video_id, category_id, curation_id
-  total_score DECIMAL(10,3) NOT NULL,
+  total_score DECIMAL(10,3) DEFAULT 0,
   view_count INT DEFAULT 0,
   favorite_count INT DEFAULT 0,
-  avg_rating DECIMAL(3,2) DEFAULT 0.00,
+  avg_rating DECIMAL(3,2) DEFAULT 0,
   ranking_date DATE NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY unique_ranking (ranking_type, entity_id, ranking_date)
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
-
--- 인덱스 생성
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_type_status ON users(user_type, user_status);
-
-CREATE INDEX idx_ai_services_type ON ai_services(ai_type);
-CREATE INDEX idx_ai_services_status ON ai_services(ai_status);
-CREATE INDEX idx_ai_services_nationality ON ai_services(nationality);
-
-CREATE INDEX idx_ai_videos_status ON ai_videos(video_status);
-CREATE INDEX idx_ai_videos_view_count ON ai_videos(view_count);
-
-CREATE INDEX idx_categories_parent ON categories(parent_id);
-CREATE INDEX idx_categories_status ON categories(category_status);
-
-CREATE INDEX idx_user_favorites_user ON user_favorites(user_id);
-CREATE INDEX idx_user_favorites_type ON user_favorites(favorite_type, favorite_id);
-
-CREATE INDEX idx_ai_service_views_service ON ai_service_views(ai_service_id);
-CREATE INDEX idx_ai_service_views_date ON ai_service_views(view_date);
-
-CREATE INDEX idx_ai_video_views_video ON ai_video_views(ai_video_id);
-CREATE INDEX idx_ai_video_views_date ON ai_video_views(view_date);
-
-CREATE INDEX idx_reviews_type_target ON reviews(review_type, review_target_id);
-CREATE INDEX idx_reviews_rating ON reviews(rating);
-
-CREATE INDEX idx_ai_service_contents_service ON ai_service_contents(ai_service_id);
-CREATE INDEX idx_ai_service_contents_type ON ai_service_contents(content_type);
-
-CREATE INDEX idx_ai_service_sns_service ON ai_service_sns(ai_service_id);
-CREATE INDEX idx_ai_service_sns_type ON ai_service_sns(sns_type);
-
-CREATE INDEX idx_ai_service_similar_service ON ai_service_similar_services(ai_service_id);
-CREATE INDEX idx_ai_service_similar_similar ON ai_service_similar_services(similar_service_id);
-
-CREATE INDEX idx_rankings_type_date ON rankings(ranking_type, ranking_date);
-CREATE INDEX idx_rankings_entity ON rankings(entity_type, entity_id);
-
-CREATE INDEX idx_curations_status ON curations(curation_status);
-CREATE INDEX idx_curations_order ON curations(curation_order);
-
--- 기본 카테고리 데이터 삽입
-INSERT INTO categories (category_name, category_description, parent_id, category_order) VALUES
--- 메인 카테고리
-('텍스트 생성', 'AI를 활용한 텍스트 생성 도구들', NULL, 1),
-('이미지 생성', 'AI를 활용한 이미지 생성 도구들', NULL, 2),
-('비디오 생성', 'AI를 활용한 비디오 생성 도구들', NULL, 3),
-('음성/오디오', 'AI를 활용한 음성 및 오디오 생성 도구들', NULL, 4),
-('코딩/개발', 'AI를 활용한 코딩 및 개발 도구들', NULL, 5),
-('비즈니스', 'AI를 활용한 비즈니스 도구들', NULL, 6),
-
--- 텍스트 생성 서브 카테고리
-('챗봇/대화', '대화형 AI 서비스', 1, 1),
-('글쓰기 도구', '글쓰기 및 편집 도구', 1, 2),
-('번역', '언어 번역 서비스', 1, 3),
-
--- 이미지 생성 서브 카테고리
-('아트/일러스트', '예술적 이미지 생성', 2, 1),
-('사진 편집', '사진 편집 및 보정', 2, 2),
-('로고/디자인', '로고 및 디자인 생성', 2, 3),
-
--- 비디오 생성 서브 카테고리
-('애니메이션', 'AI 애니메이션 생성', 3, 1),
-('영상 편집', 'AI 영상 편집 도구', 3, 2),
-
--- 음성/오디오 서브 카테고리
-('음성 합성', 'AI 음성 생성', 4, 1),
-('음악 생성', 'AI 음악 작곡', 4, 2),
-
--- 코딩/개발 서브 카테고리
-('코드 생성', 'AI 코드 생성 도구', 5, 1),
-('코드 리뷰', 'AI 코드 분석 및 리뷰', 5, 2),
-
--- 비즈니스 서브 카테고리
-('마케팅', 'AI 마케팅 도구', 6, 1),
-('데이터 분석', 'AI 데이터 분석 도구', 6, 2);
 
 -- Site Settings 테이블 (사이트 정보 관리)
 CREATE TABLE site_settings (
@@ -327,6 +349,3 @@ CREATE TABLE site_settings (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
-
--- 기본 사이트 설정 데이터 삽입
-INSERT INTO site_settings (site_title, company_name) VALUES ('StepAI', 'StepAI');

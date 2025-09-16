@@ -26,6 +26,7 @@ router.get('/', async (_req, res) => {
         category_icon: row.category_icon,
         parent_id: row.parent_id,
         category_order: row.category_order,
+        priority: 0,
         category_status: row.category_status,
         created_at: row.created_at,
         updated_at: row.updated_at

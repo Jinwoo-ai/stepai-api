@@ -65,9 +65,23 @@ router.get('/', async (req, res) => {
           [video.id]
         );
         
+        // 태그 정보 포함
+        const [tags] = await connection.execute<RowDataPacket[]>(
+          `SELECT t.tag_name
+           FROM tags t
+           INNER JOIN ai_video_tags avt ON t.id = avt.tag_id
+           WHERE avt.ai_video_id = ?
+           ORDER BY t.tag_name`,
+          [video.id]
+        );
+        
+        let tagsString = tags.map(tag => tag.tag_name).join(' #');
+        if (tagsString) tagsString = '#' + tagsString;
+        
         videosWithCategories.push({
           ...video,
-          categories: categories
+          categories: categories,
+          tags: tagsString
         });
       }
 
@@ -107,7 +121,8 @@ router.post('/', async (req, res) => {
       video_status = 'active',
       is_visible = true,
       categories = [],
-      ai_services = []
+      ai_services = [],
+      selected_tags = []
     } = req.body;
 
     if (!video_title || !video_url) {
@@ -155,6 +170,28 @@ router.post('/', async (req, res) => {
         }
       }
 
+      // 태그 처리
+      if (selected_tags && selected_tags.length > 0) {
+        for (const tagId of selected_tags) {
+          await connection.execute(
+            'INSERT IGNORE INTO ai_video_tags (ai_video_id, tag_id) VALUES (?, ?)',
+            [videoId, tagId]
+          );
+        }
+        
+        // 태그 사용 횟수 업데이트
+        for (const tagId of selected_tags) {
+          await connection.execute(
+            `UPDATE tags SET tag_count = (
+              SELECT COUNT(*) FROM ai_service_tags WHERE tag_id = ?
+            ) + (
+              SELECT COUNT(*) FROM ai_video_tags WHERE tag_id = ?
+            ) WHERE id = ?`,
+            [tagId, tagId, tagId]
+          );
+        }
+      }
+
       await connection.commit();
 
       res.status(201).json({
@@ -190,7 +227,8 @@ router.put('/:id', async (req, res) => {
       video_status,
       is_visible,
       categories = [],
-      ai_services = []
+      ai_services = [],
+      selected_tags = []
     } = req.body;
 
     if (isNaN(id)) {
@@ -261,6 +299,34 @@ router.put('/:id', async (req, res) => {
           await connection.execute(
             'INSERT INTO ai_video_services (ai_video_id, ai_service_id, usage_order) VALUES (?, ?, ?)',
             [id, service.id || service.ai_service_id, i + 1]
+          );
+        }
+      }
+
+      // 태그 업데이트
+      if (selected_tags !== undefined) {
+        // 기존 태그 연결 삭제
+        await connection.execute('DELETE FROM ai_video_tags WHERE ai_video_id = ?', [id]);
+        
+        if (selected_tags && selected_tags.length > 0) {
+          for (const tagId of selected_tags) {
+            await connection.execute(
+              'INSERT INTO ai_video_tags (ai_video_id, tag_id) VALUES (?, ?)',
+              [id, tagId]
+            );
+          }
+        }
+        
+        // 모든 태그의 사용 횟수 업데이트
+        const [allTags] = await connection.execute<RowDataPacket[]>('SELECT id FROM tags');
+        for (const tag of allTags) {
+          await connection.execute(
+            `UPDATE tags SET tag_count = (
+              SELECT COUNT(*) FROM ai_service_tags WHERE tag_id = ?
+            ) + (
+              SELECT COUNT(*) FROM ai_video_tags WHERE tag_id = ?
+            ) WHERE id = ?`,
+            [tag.id, tag.id, tag.id]
           );
         }
       }
