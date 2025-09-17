@@ -139,7 +139,7 @@ router.get('/', async (req, res) => {
         
         // 태그 정보 포함
         const [tags] = await connection.execute<RowDataPacket[]>(
-          `SELECT t.tag_name
+          `SELECT t.id, t.tag_name
            FROM tags t
            INNER JOIN ai_service_tags ast ON t.id = ast.tag_id
            WHERE ast.ai_service_id = ?
@@ -148,6 +148,7 @@ router.get('/', async (req, res) => {
         );
         serviceData['tags'] = tags.map(tag => tag['tag_name']).join(' #');
         if (serviceData['tags']) serviceData['tags'] = '#' + serviceData['tags'];
+        serviceData['tag_ids'] = tags.map(tag => tag['id']);
         
         // AI 타입 정보 포함
         const [aiTypes] = await connection.execute<RowDataPacket[]>(
@@ -184,7 +185,7 @@ router.get('/', async (req, res) => {
         
         // 유사 서비스 정보 포함
         const [similarServices] = await connection.execute<RowDataPacket[]>(
-          `SELECT s.id, s.ai_name
+          `SELECT s.id, s.ai_name, s.ai_logo, s.company_name
            FROM ai_services s
            INNER JOIN ai_service_similar_services ass ON s.id = ass.similar_service_id
            WHERE ass.ai_service_id = ?
@@ -192,6 +193,16 @@ router.get('/', async (req, res) => {
           [service['id']]
         );
         serviceData['similar_services_list'] = similarServices;
+        
+        // 콘텐츠 정보 포함
+        const [contents] = await connection.execute<RowDataPacket[]>(
+          `SELECT content_type, content_title, content_text, content_order
+           FROM ai_service_contents
+           WHERE ai_service_id = ?
+           ORDER BY content_order`,
+          [service['id']]
+        );
+        serviceData['contents'] = contents;
         
         servicesWithCategories.push(serviceData);
       }
@@ -453,6 +464,25 @@ router.post('/upload-excel', upload.single('excel'), async (req, res) => {
                   [serviceId, tagId]
                 );
               }
+            }
+          }
+
+          // 콘텐츠 정보 저장 (Rich Text 형태로)
+          const contentTypes = [
+            { type: 'target_users', title: '타겟 사용자', field: '타겟 사용자', order: 1 },
+            { type: 'main_features', title: '주요 기능', field: '주요기능', order: 2 },
+            { type: 'use_cases', title: '추천 활용사례', field: '추천활용사례', order: 3 }
+          ];
+          
+          for (const contentType of contentTypes) {
+            if (row[contentType.field]) {
+              // 텍스트를 Rich Text HTML 형태로 변환
+              const htmlContent = `<p>${row[contentType.field].toString().replace(/\n/g, '</p><p>')}</p>`;
+              
+              await connection.execute(
+                'INSERT INTO ai_service_contents (ai_service_id, content_type, content_title, content_text, content_order) VALUES (?, ?, ?, ?, ?)',
+                [serviceId, contentType.type, contentType.title, htmlContent, contentType.order]
+              );
             }
           }
 
