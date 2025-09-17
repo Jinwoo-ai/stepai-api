@@ -38,6 +38,35 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/assets', express.static(path.join(__dirname, '../public/assets')));
 app.use('/public', express.static(path.join(__dirname, '../public')));
 
+// Mock API 응답들
+app.get('/api/tags', (req, res) => {
+  res.json({ success: true, data: [] });
+});
+
+app.get('/api/categories', (req, res) => {
+  res.json({ success: true, data: [] });
+});
+
+app.get('/api/ai-types', (req, res) => {
+  res.json({ success: true, data: [] });
+});
+
+app.get('/api/ai-types/pricing-models', (req, res) => {
+  res.json({ success: true, data: [] });
+});
+
+app.get('/api/ai-types/target-types', (req, res) => {
+  res.json({ success: true, data: [] });
+});
+
+app.get('/api/ai-services', (req, res) => {
+  res.json({ success: true, data: { data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } } });
+});
+
+app.get('/api/ai-videos', (req, res) => {
+  res.json({ success: true, data: { data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } } });
+});
+
 // 헬스체크 엔드포인트
 app.get('/health', async (req, res) => {
   res.json({
@@ -53,7 +82,10 @@ app.get('/', (req, res) => {
     message: 'StepAI API 서버가 실행 중입니다.',
     version: '1.0.0',
     endpoints: {
-      health: '/health'
+      health: '/health',
+      tags: '/api/tags',
+      categories: '/api/categories',
+      aiServices: '/api/ai-services'
     }
   });
 });
@@ -79,7 +111,6 @@ app.use((err, req, res, next) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(\`🚀 StepAI API 서버가 포트 \${PORT}에서 실행 중입니다.\`);
   console.log(\`💚 헬스체크: http://localhost:\${PORT}/health\`);
-  console.log(\`🌐 Railway Internal: http://stepai-api.railway.internal:\${PORT}\`);
 });
 
 module.exports = app;
