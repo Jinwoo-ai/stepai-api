@@ -5,6 +5,12 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc --skipLibCheck",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop stepai-api",
+    "pm2:restart": "pm2 restart stepai-api",
+    "pm2:delete": "pm2 delete stepai-api",
+    "pm2:logs": "pm2 logs stepai-api",
+    "deploy": "./deploy.sh",
     "build:simple": "node build-simple.js",
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
