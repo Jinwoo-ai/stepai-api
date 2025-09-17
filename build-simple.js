@@ -79,6 +79,7 @@ app.use((err, req, res, next) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(\`🚀 StepAI API 서버가 포트 \${PORT}에서 실행 중입니다.\`);
   console.log(\`💚 헬스체크: http://localhost:\${PORT}/health\`);
+  console.log(\`🌐 Railway Internal: http://stepai-api.railway.internal:\${PORT}\`);
 });
 
 module.exports = app;
