@@ -16,7 +16,7 @@ import dashboardRouter from './routes/dashboard';
 import curationsRouter from './routes/curations';
 import usersRouter from './routes/users';
 import siteSettingsRouter from './routes/siteSettings';
-import tagsRouter from './routes/tags';
+import tagsRouter from './routes/tags-simple';
 import aiTypesRouter from './routes/aiTypes';
 
 const app = express();
@@ -26,6 +26,12 @@ const PORT = parseInt(process.env['PORT'] || '3004');
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// 디버깅용 로깅 미들웨어
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`);
+  next();
+});
 
 
 
@@ -110,7 +116,8 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
 // Swagger UI 설정
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// API 라우터들
+// API 라우터들 (더 구체적인 라우트를 먼저 등록)
+app.use('/api/tags', tagsRouter);
 app.use('/api/ai-services', aiServicesRouter);
 app.use('/api/ai-videos', aiVideosRouter);
 app.use('/api/categories', categoriesRouter);
@@ -118,7 +125,6 @@ app.use('/api/dashboard', dashboardRouter);
 app.use('/api/curations', curationsRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/site-settings', siteSettingsRouter);
-app.use('/api/tags', tagsRouter);
 app.use('/api/ai-types', aiTypesRouter);
 
 // 헬스체크 엔드포인트

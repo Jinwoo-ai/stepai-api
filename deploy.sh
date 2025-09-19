@@ -16,9 +16,9 @@ npm run build
 
 # PM2로 재시작
 echo "🔄 PM2 재시작..."
-pm2 restart stepai-api || pm2 start ecosystem.config.js
+npx pm2 restart stepai-api || npx pm2 start ecosystem.config.js
 
 # 상태 확인
 echo "✅ 배포 완료! 상태 확인:"
-pm2 status stepai-api
-pm2 logs stepai-api --lines 10
+npx pm2 status stepai-api
+npx pm2 logs stepai-api --lines 10

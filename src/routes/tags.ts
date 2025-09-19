@@ -4,9 +4,103 @@ import { getDatabaseConnection } from '../configs/database';
 
 const router = express.Router();
 
+// 디버깅용 로그
+console.log('Tags router loaded successfully');
+
+// 모든 요청 로깅 미들웨어 (라우트보다 먼저 정의)
+router.use((req, res, next) => {
+  console.log(`Tags router: ${req.method} ${req.path}`);
+  next();
+});
+
 // 테스트 엔드포인트
 router.get('/test', (_req, res) => {
   res.json({ success: true, message: 'Tags API is working!' });
+});
+
+// 간단한 items 테스트
+router.get('/14/items', (_req, res) => {
+  console.log('Direct /14/items route hit!');
+  res.json({ success: true, message: 'Direct route working!', data: { services: [], videos: [] } });
+});
+
+// 특정 태그의 AI 서비스/비디오 목록 조회 (이 라우트를 먼저 정의)
+router.get('/:id/items', async (req, res) => {
+  console.log('/:id/items route hit with params:', req.params);
+  try {
+    const tagId = parseInt(req.params.id);
+    console.log('Fetching items for tag ID:', tagId);
+    
+    if (isNaN(tagId)) {
+      return res.status(400).json({
+        success: false,
+        error: '유효하지 않은 태그 ID입니다.'
+      });
+    }
+
+    const pool = getDatabaseConnection();
+    const connection = await pool.getConnection();
+    
+    try {
+      // 태그 존재 확인
+      const [tagCheck] = await connection.execute<RowDataPacket[]>(
+        'SELECT id FROM tags WHERE id = ?',
+        [tagId]
+      );
+      
+      if (tagCheck.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: '태그를 찾을 수 없습니다.'
+        });
+      }
+
+      // AI 서비스 목록 (ai_type 컬럼이 없으므로 제거)
+      const [services] = await connection.execute<RowDataPacket[]>(
+        `SELECT s.id, s.ai_name, s.created_at
+         FROM ai_services s
+         INNER JOIN ai_service_tags ast ON s.id = ast.ai_service_id
+         WHERE ast.tag_id = ? AND (s.deleted_at IS NULL OR s.deleted_at = '')
+         ORDER BY s.ai_name`,
+        [tagId]
+      );
+
+      // AI 비디오 목록
+      const [videos] = await connection.execute<RowDataPacket[]>(
+        `SELECT v.id, v.video_title, v.created_at
+         FROM ai_videos v
+         INNER JOIN ai_video_tags avt ON v.id = avt.ai_video_id
+         WHERE avt.tag_id = ? AND (v.deleted_at IS NULL OR v.deleted_at = '')
+         ORDER BY v.video_title`,
+        [tagId]
+      );
+
+      console.log(`Found ${services.length} services and ${videos.length} videos for tag ${tagId}`);
+
+      res.json({
+        success: true,
+        data: {
+          services,
+          videos
+        }
+      });
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Error fetching tag items:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      sqlState: error.sqlState,
+      sqlMessage: error.sqlMessage
+    });
+    return res.status(500).json({
+      success: false,
+      error: '태그 아이템 조회 중 오류가 발생했습니다.',
+      details: error.message
+    });
+  }
 });
 
 // 태그 목록 조회
@@ -43,60 +137,7 @@ router.get('/', async (_req, res) => {
   }
 });
 
-// 특정 태그의 AI 서비스/비디오 목록 조회
-router.get('/:id/items', async (req, res) => {
-  try {
-    const tagId = parseInt(req.params.id);
-    
-    if (isNaN(tagId)) {
-      return res.status(400).json({
-        success: false,
-        error: '유효하지 않은 태그 ID입니다.'
-      });
-    }
 
-    const pool = getDatabaseConnection();
-    const connection = await pool.getConnection();
-    
-    try {
-      // AI 서비스 목록
-      const [services] = await connection.execute<RowDataPacket[]>(
-        `SELECT s.id, s.ai_name, s.ai_type, s.created_at
-         FROM ai_services s
-         INNER JOIN ai_service_tags ast ON s.id = ast.ai_service_id
-         WHERE ast.tag_id = ? AND s.deleted_at IS NULL
-         ORDER BY s.ai_name`,
-        [tagId]
-      );
-
-      // AI 비디오 목록
-      const [videos] = await connection.execute<RowDataPacket[]>(
-        `SELECT v.id, v.video_title, v.created_at
-         FROM ai_videos v
-         INNER JOIN ai_video_tags avt ON v.id = avt.ai_video_id
-         WHERE avt.tag_id = ? AND v.deleted_at IS NULL
-         ORDER BY v.video_title`,
-        [tagId]
-      );
-
-      res.json({
-        success: true,
-        data: {
-          services,
-          videos
-        }
-      });
-    } finally {
-      connection.release();
-    }
-  } catch (error) {
-    console.error('Error fetching tag items:', error);
-    return res.status(500).json({
-      success: false,
-      error: '태그 아이템 조회 중 오류가 발생했습니다.'
-    });
-  }
-});
 
 // 태그에서 AI 서비스 제거
 router.delete('/:tagId/services/:serviceId', async (req, res) => {
