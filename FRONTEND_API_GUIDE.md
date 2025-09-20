@@ -147,6 +147,194 @@ GET /api/ai-services/123/detail
 GET /api/ai-services/search?q=ChatGPT
 ```
 
+#### 4. AI 서비스 아이콘 업로드
+```http
+POST /api/ai-services/upload-icon
+Content-Type: multipart/form-data
+
+icon: [이미지 파일]
+```
+
+**지원 파일 형식:** jpg, jpeg, png, gif, ico, svg (최대 5MB)
+
+**응답 예시:**
+```json
+{
+  "success": true,
+  "data": {
+    "url": "/uploads/icons/1704067200000_abc123.png",
+    "filename": "1704067200000_abc123.png"
+  },
+  "message": "아이콘이 업로드되었습니다."
+}
+```
+
+## 🎬 영상 관리 API
+
+### 영상 상태
+- `active`: 활성 상태
+- `inactive`: 비활성 상태
+
+### 주요 엔드포인트
+
+#### 1. 영상 목록 조회 (AI 서비스 포함)
+```http
+GET /api/ai-videos?page=1&limit=20&video_status=active
+```
+
+**응답 예시:**
+```json
+{
+  "success": true,
+  "data": {
+    "data": [
+      {
+        "id": 3,
+        "video_title": "dify 사용법",
+        "video_url": "https://youtu.be/xWG4nYBZTsE",
+        "thumbnail_url": "https://img.youtube.com/vi/xWG4nYBZTsE/maxresdefault.jpg",
+        "ai_services": [
+          {
+            "id": 39,
+            "ai_name": "ChatPDF",
+            "usage_order": 1
+          }
+        ],
+        "tags": "#AI글쓰기 #AI영상생성",
+        "tag_ids": [1, 22]
+      }
+    ]
+  }
+}
+```
+
+#### 2. 영상 생성
+```http
+POST /api/ai-videos
+Content-Type: application/json
+
+{
+  "video_title": "AI 도구 사용법",
+  "video_description": "<p>초보자를 위한 AI 도구 가이드</p>",
+  "video_url": "https://youtube.com/watch?v=example",
+  "video_status": "active",
+  "is_visible": true,
+  "ai_services": [
+    {
+      "ai_service_id": 1,
+      "usage_order": 1
+    }
+  ],
+  "selected_tags": [1, 2]
+}
+```
+
+## 📋 큐레이션 관리 API
+
+### 큐레이션 상태
+- `active`: 활성 상태
+- `inactive`: 비활성 상태
+
+### 주요 엔드포인트
+
+#### 1. 큐레이션 목록 조회 (AI 서비스 포함)
+```http
+GET /api/curations?page=1&limit=10&curation_status=active&include_ai_services=true
+```
+
+**응답 예시:**
+```json
+{
+  "success": true,
+  "data": {
+    "data": [
+      {
+        "id": 1,
+        "curation_title": "CEO's PICK AI서비스",
+        "curation_description": "<p>CEO's Pick</p>",
+        "curation_order": 1,
+        "ai_services": [
+          {
+            "id": 1,
+            "ai_name": "ChatGPT",
+            "ai_description": "OpenAI의 대화형 인공지능",
+            "service_order": 1
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### 2. 큐레이션 생성
+```http
+POST /api/curations
+Content-Type: application/json
+
+{
+  "curation_title": "추천 AI 도구",
+  "curation_description": "<p>업무 효율성을 높이는 AI 도구들</p>",
+  "curation_order": 1,
+  "curation_status": "active",
+  "ai_service_ids": [1, 2, 3]
+}
+```
+
+## 🏷️ 태그 관리 API
+
+### 주요 엔드포인트
+
+#### 1. 태그 목록 조회
+```http
+GET /api/tags
+```
+
+**응답 예시:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "tag_name": "AI글쓰기",
+      "tag_count": 61,
+      "service_count": 61,
+      "video_count": 0,
+      "created_at": "2025-09-10T07:32:21.000Z"
+    }
+  ]
+}
+```
+
+#### 2. 태그별 아이템 조회
+```http
+GET /api/tags/14/items
+```
+
+**응답 예시:**
+```json
+{
+  "success": true,
+  "data": {
+    "services": [
+      {
+        "id": 1,
+        "ai_name": "ChatGPT",
+        "created_at": "2024-01-01T00:00:00.000Z"
+      }
+    ],
+    "videos": [
+      {
+        "id": 1,
+        "video_title": "AI 사용법",
+        "created_at": "2024-01-01T00:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
 ## 👨‍💼 전문가 관리 API
 
 ### 전문가 정보 구조
