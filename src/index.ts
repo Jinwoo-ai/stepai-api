@@ -16,7 +16,7 @@ import dashboardRouter from './routes/dashboard';
 import curationsRouter from './routes/curations';
 import usersRouter from './routes/users';
 import siteSettingsRouter from './routes/siteSettings';
-import tagsRouter from './routes/tags-simple';
+import tagsRouter from './routes/tags';
 import aiTypesRouter from './routes/aiTypes';
 
 const app = express();
@@ -24,8 +24,8 @@ const PORT = parseInt(process.env['PORT'] || '3004');
 
 // 미들웨어 설정
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // 디버깅용 로깅 미들웨어
 app.use((req, res, next) => {
@@ -38,6 +38,7 @@ app.use((req, res, next) => {
 // 정적 파일 서빙
 app.use('/assets', express.static(path.join(__dirname, '../public/assets')));
 app.use('/public', express.static(path.join(__dirname, '../public')));
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 // Swagger 설정
 const swaggerOptions = {
@@ -119,6 +120,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // API 라우터들 (더 구체적인 라우트를 먼저 등록)
 app.use('/api/tags', tagsRouter);
 app.use('/api/ai-services', aiServicesRouter);
+app.use('/api/videos', aiVideosRouter);
 app.use('/api/ai-videos', aiVideosRouter);
 app.use('/api/categories', categoriesRouter);
 app.use('/api/dashboard', dashboardRouter);

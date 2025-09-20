@@ -67,7 +67,7 @@ router.get('/', async (req, res) => {
         
         // 태그 정보 포함
         const [tags] = await connection.execute<RowDataPacket[]>(
-          `SELECT t.tag_name
+          `SELECT t.id, t.tag_name
            FROM tags t
            INNER JOIN ai_video_tags avt ON t.id = avt.tag_id
            WHERE avt.ai_video_id = ?
@@ -75,13 +75,42 @@ router.get('/', async (req, res) => {
           [video.id]
         );
         
-        let tagsString = tags.map(tag => tag.tag_name).join(' #');
+        // AI 서비스 정보 포함
+        let aiServices = [];
+        try {
+          // 먼저 연결 테이블에서 서비스 ID들 조회
+          const [serviceIds] = await connection.execute<RowDataPacket[]>(
+            'SELECT ai_service_id, usage_order FROM ai_video_services WHERE ai_video_id = ? ORDER BY usage_order ASC',
+            [video.id]
+          );
+          
+          for (const serviceLink of serviceIds) {
+            const [services] = await connection.execute<RowDataPacket[]>(
+              'SELECT id, ai_name, ai_description, ai_logo, company_name, difficulty_level FROM ai_services WHERE id = ?',
+              [serviceLink.ai_service_id]
+            );
+            
+            if (services.length > 0) {
+              aiServices.push({
+                ...services[0],
+                usage_order: serviceLink.usage_order
+              });
+            }
+          }
+        } catch (serviceError) {
+          console.error('AI services query error for video:', video.id, serviceError);
+          aiServices = [];
+        }
+        
+        let tagsString = tags.map(tag => tag['tag_name']).join(' #');
         if (tagsString) tagsString = '#' + tagsString;
         
         videosWithCategories.push({
           ...video,
           categories: categories,
-          tags: tagsString
+          ai_services: aiServices,
+          tags: tagsString,
+          tag_ids: tags.map(tag => tag['id']) // Admin 인터페이스에서 필요
         });
       }
 
@@ -163,10 +192,13 @@ router.post('/', async (req, res) => {
       if (ai_services && ai_services.length > 0) {
         for (let i = 0; i < ai_services.length; i++) {
           const service = ai_services[i];
-          await connection.execute(
-            'INSERT INTO ai_video_services (ai_video_id, ai_service_id, usage_order) VALUES (?, ?, ?)',
-            [videoId, service.id || service.ai_service_id, i + 1]
-          );
+          const serviceId = service.ai_service_id || service.id;
+          if (serviceId) {
+            await connection.execute(
+              'INSERT INTO ai_video_services (ai_video_id, ai_service_id, usage_order) VALUES (?, ?, ?)',
+              [videoId, serviceId, service.usage_order || i + 1]
+            );
+          }
         }
       }
 
@@ -292,14 +324,19 @@ router.put('/:id', async (req, res) => {
       }
 
       // AI 서비스 업데이트
-      if (ai_services) {
+      if (ai_services !== undefined) {
         await connection.execute('DELETE FROM ai_video_services WHERE ai_video_id = ?', [id]);
-        for (let i = 0; i < ai_services.length; i++) {
-          const service = ai_services[i];
-          await connection.execute(
-            'INSERT INTO ai_video_services (ai_video_id, ai_service_id, usage_order) VALUES (?, ?, ?)',
-            [id, service.id || service.ai_service_id, i + 1]
-          );
+        if (ai_services && ai_services.length > 0) {
+          for (let i = 0; i < ai_services.length; i++) {
+            const service = ai_services[i];
+            const serviceId = service.ai_service_id || service.id;
+            if (serviceId) {
+              await connection.execute(
+                'INSERT INTO ai_video_services (ai_video_id, ai_service_id, usage_order) VALUES (?, ?, ?)',
+                [id, serviceId, service.usage_order || i + 1]
+              );
+            }
+          }
         }
       }
 
@@ -437,14 +474,29 @@ router.get('/:id', async (req, res) => {
       );
 
       // AI 서비스 정보 조회
-      const [aiServices] = await connection.execute<RowDataPacket[]>(
-        `SELECT a.id, a.ai_name, avs.usage_order 
-         FROM ai_services a 
-         INNER JOIN ai_video_services avs ON a.id = avs.ai_service_id 
-         WHERE avs.ai_video_id = ?
-         ORDER BY avs.usage_order`,
-        [id]
-      );
+      const aiServices = [];
+      try {
+        const [serviceIds] = await connection.execute<RowDataPacket[]>(
+          'SELECT ai_service_id, usage_order FROM ai_video_services WHERE ai_video_id = ? ORDER BY usage_order ASC',
+          [id]
+        );
+        
+        for (const serviceLink of serviceIds) {
+          const [services] = await connection.execute<RowDataPacket[]>(
+            'SELECT id, ai_name, ai_description, ai_logo, company_name, difficulty_level FROM ai_services WHERE id = ?',
+            [serviceLink.ai_service_id]
+          );
+          
+          if (services.length > 0) {
+            aiServices.push({
+              ...services[0],
+              usage_order: serviceLink.usage_order
+            });
+          }
+        }
+      } catch (serviceError) {
+        console.error('AI services query error for video detail:', id, serviceError);
+      }
 
       res.json({
         success: true,

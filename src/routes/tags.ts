@@ -111,19 +111,31 @@ router.get('/', async (_req, res) => {
     
     try {
       const [tags] = await connection.execute<RowDataPacket[]>(
-        `SELECT t.*, 
+        `SELECT t.id, t.tag_name, t.tag_count,
                 COUNT(DISTINCT ast.ai_service_id) as service_count,
-                COUNT(DISTINCT avt.ai_video_id) as video_count
+                COUNT(DISTINCT avt.ai_video_id) as video_count,
+                t.created_at, t.updated_at
          FROM tags t
          LEFT JOIN ai_service_tags ast ON t.id = ast.tag_id
          LEFT JOIN ai_video_tags avt ON t.id = avt.tag_id
-         GROUP BY t.id
+         GROUP BY t.id, t.tag_name, t.tag_count, t.created_at, t.updated_at
          ORDER BY t.tag_count DESC, t.tag_name ASC`
       );
 
+      // Admin 인터페이스에서 기대하는 형식으로 변환
+      const formattedTags = tags.map(tag => ({
+        id: tag['id'],
+        tag_name: tag['tag_name'],
+        tag_count: tag['tag_count'] || (tag['service_count'] + tag['video_count']),
+        service_count: tag['service_count'] || 0,
+        video_count: tag['video_count'] || 0,
+        created_at: tag['created_at'],
+        updated_at: tag['updated_at']
+      }));
+
       res.json({
         success: true,
-        data: tags
+        data: formattedTags
       });
     } finally {
       connection.release();
@@ -132,7 +144,8 @@ router.get('/', async (_req, res) => {
     console.error('Error fetching tags:', error);
     return res.status(500).json({
       success: false,
-      error: '태그 조회 중 오류가 발생했습니다.'
+      error: '태그 조회 중 오류가 발생했습니다.',
+      details: error.message
     });
   }
 });

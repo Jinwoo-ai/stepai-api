@@ -4,6 +4,99 @@ import { getDatabaseConnection } from '../configs/database';
 
 const router = express.Router();
 
+// 메인페이지용 큐레이션 조회
+router.get('/main', async (req, res) => {
+  try {
+    const pool = getDatabaseConnection();
+    const connection = await pool.getConnection();
+    
+    try {
+      // 모든 활성 큐레이션 조회
+      const [curations] = await connection.execute<RowDataPacket[]>(
+        `SELECT c.id, c.curation_title, c.curation_description, c.curation_order
+         FROM curations c
+         WHERE c.curation_status = 'active' AND c.deleted_at IS NULL
+         ORDER BY c.curation_order ASC`
+      );
+
+      const result = {};
+      
+      for (const curation of curations) {
+        try {
+          // 각 큐레이션의 AI 서비스 조회
+          const [aiServices] = await connection.execute<RowDataPacket[]>(
+            `SELECT a.id, a.ai_name, a.ai_description, a.ai_logo, a.company_name, a.pricing_model,
+                    cas.service_order
+             FROM ai_services a
+             INNER JOIN curation_ai_services cas ON a.id = cas.ai_service_id
+             WHERE cas.curation_id = ? AND a.deleted_at IS NULL
+             ORDER BY cas.service_order ASC`,
+            [curation.id]
+          );
+
+          // 각 AI 서비스의 카테고리 조회
+          const servicesWithCategories = [];
+          for (const service of aiServices) {
+            try {
+              const [categories] = await connection.execute<RowDataPacket[]>(
+                `SELECT cat.id, cat.category_name
+                 FROM categories cat
+                 INNER JOIN ai_service_categories asc ON cat.id = asc.category_id
+                 WHERE asc.ai_service_id = ?`,
+                [service.id]
+              );
+              
+              servicesWithCategories.push({
+                ...service,
+                categories: categories || []
+              });
+            } catch (categoryError) {
+              console.error('Category query error:', categoryError);
+              servicesWithCategories.push({
+                ...service,
+                categories: []
+              });
+            }
+          }
+
+          // 큐레이션 제목에 따라 분류
+          const title = (curation.curation_title || '').toLowerCase();
+          if (title.includes('popular') || title.includes('인기') || title.includes('많이')) {
+            result['popular'] = servicesWithCategories;
+          } else if (title.includes('latest') || title.includes('최신') || title.includes('등록')) {
+            result['latest'] = servicesWithCategories;
+          } else if (title.includes('pick') || title.includes('추천')) {
+            result['step-pick'] = servicesWithCategories;
+          } else {
+            // 기본값 설정
+            if (!result['popular']) result['popular'] = servicesWithCategories;
+          }
+        } catch (serviceError) {
+          console.error('Service query error for curation:', curation.id, serviceError);
+        }
+      }
+
+      // 기본값 설정
+      if (!result['popular']) result['popular'] = [];
+      if (!result['latest']) result['latest'] = [];
+      if (!result['step-pick']) result['step-pick'] = [];
+
+      res.json({
+        success: true,
+        data: result
+      });
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Error fetching main curations:', error);
+    res.status(500).json({
+      success: false,
+      error: '큐레이션 조회 중 오류가 발생했습니다.'
+    });
+  }
+});
+
 // 큐레이션 목록 조회
 router.get('/', async (req, res) => {
   try {
@@ -55,15 +148,36 @@ router.get('/', async (req, res) => {
         let curationData = { ...curation };
         
         if (include_ai_services) {
-          const [aiServices] = await connection.execute<RowDataPacket[]>(
-            `SELECT a.id, a.ai_name, cas.service_order 
-             FROM ai_services a 
-             INNER JOIN curation_ai_services cas ON a.id = cas.ai_service_id 
-             WHERE cas.curation_id = ? AND a.deleted_at IS NULL
-             ORDER BY cas.service_order ASC`,
-            [curation.id]
-          );
-          curationData.ai_services = aiServices;
+          try {
+
+            
+            // 먼저 연결 테이블에서 서비스 ID들 조회
+            const [serviceIds] = await connection.execute<RowDataPacket[]>(
+              'SELECT ai_service_id, service_order FROM curation_ai_services WHERE curation_id = ? ORDER BY service_order ASC',
+              [curation.id]
+            );
+
+            
+            const aiServices = [];
+            for (const serviceLink of serviceIds) {
+              const [services] = await connection.execute<RowDataPacket[]>(
+                'SELECT id, ai_name, ai_description, ai_logo, company_name, difficulty_level FROM ai_services WHERE id = ?',
+                [serviceLink.ai_service_id]
+              );
+              
+              if (services.length > 0) {
+                aiServices.push({
+                  ...services[0],
+                  service_order: serviceLink.service_order
+                });
+              }
+            }
+            
+            curationData.ai_services = aiServices;
+          } catch (serviceError) {
+            console.error('AI services query error for curation:', curation.id, serviceError);
+            curationData.ai_services = [];
+          }
         }
         
         curationsWithServices.push(curationData);
@@ -224,13 +338,15 @@ router.put('/:id', async (req, res) => {
       }
 
       // AI 서비스 업데이트
-      if (ai_service_ids) {
+      if (ai_service_ids !== undefined) {
         await connection.execute('DELETE FROM curation_ai_services WHERE curation_id = ?', [id]);
-        for (let i = 0; i < ai_service_ids.length; i++) {
-          await connection.execute(
-            'INSERT INTO curation_ai_services (curation_id, ai_service_id, service_order) VALUES (?, ?, ?)',
-            [id, ai_service_ids[i], i + 1]
-          );
+        if (ai_service_ids && ai_service_ids.length > 0) {
+          for (let i = 0; i < ai_service_ids.length; i++) {
+            await connection.execute(
+              'INSERT INTO curation_ai_services (curation_id, ai_service_id, service_order) VALUES (?, ?, ?)',
+              [id, ai_service_ids[i], i + 1]
+            );
+          }
         }
       }
 

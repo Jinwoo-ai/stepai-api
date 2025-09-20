@@ -21,10 +21,69 @@ const upload = multer({
   }
 });
 
+// 이미지 업로드 설정
+const imageUpload = multer({
+  dest: 'public/uploads/icons/',
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB
+  },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (['.jpg', '.jpeg', '.png', '.gif', '.ico', '.svg'].includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('이미지 파일만 업로드 가능합니다.'));
+    }
+  }
+});
+
 // 테스트 POST 라우트
 router.post('/test', (_req, res) => {
   console.log('TEST POST ROUTE HIT');
   res.json({ message: 'test post works' });
+});
+
+// 아이콘 업로드 엔드포인트
+router.post('/upload-icon', imageUpload.single('icon'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: '이미지 파일이 필요합니다.'
+      });
+    }
+
+    const originalName = req.file.originalname;
+    const ext = path.extname(originalName);
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}${ext}`;
+    const newPath = path.join('public/uploads/icons/', fileName);
+    
+    // 파일 이름 변경
+    fs.renameSync(req.file.path, newPath);
+    
+    // URL 반환
+    const fileUrl = `/uploads/icons/${fileName}`;
+    
+    res.json({
+      success: true,
+      data: {
+        url: fileUrl,
+        filename: fileName
+      },
+      message: '아이콘이 업로드되었습니다.'
+    });
+  } catch (error) {
+    console.error('Error uploading icon:', error);
+    
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: '아이콘 업로드 중 오류가 발생했습니다.'
+    });
+  }
 });
 
 // AI 서비스 검색
@@ -160,6 +219,7 @@ router.get('/', async (req, res) => {
           [service['id']]
         );
         serviceData['ai_types'] = aiTypes.map(type => type['type_name']);
+        serviceData['ai_type'] = aiTypes.map(type => type['type_name']).join(', '); // 호환성을 위한 필드
         
         // 가격 모델 정보 포함
         const [pricingModels] = await connection.execute<RowDataPacket[]>(
@@ -586,33 +646,84 @@ router.post('/', async (req, res) => {
       await connection.beginTransaction();
       
       const {
-        ai_name, ai_name_en, ai_description, ai_type, ai_website, ai_logo,
+        ai_name, ai_name_en, ai_description, ai_website, ai_logo,
         company_name, company_name_en, embedded_video_url, headquarters,
-        main_features, target_users, use_cases, similar_services,
-        pricing_model, pricing_info, difficulty_level, target_type, usage_availability,
+        pricing_info, difficulty_level, usage_availability,
         nationality, is_visible, is_step_pick, categories, contents, sns,
-        similar_service_ids, selected_tags
+        similar_service_ids, selected_tags, ai_type_ids, pricing_model_ids, target_type_ids
       } = req.body;
       
-      // AI 서비스 생성
+      // AI 서비스 생성 (새로운 스키마에 맞게 수정)
       const [result] = await connection.execute<ResultSetHeader>(
         `INSERT INTO ai_services (
-          ai_name, ai_name_en, ai_description, ai_type, ai_website, ai_logo,
+          ai_name, ai_name_en, ai_description, ai_website, ai_logo,
           company_name, company_name_en, embedded_video_url, headquarters,
-          main_features, target_users, use_cases, similar_services,
-          pricing_model, pricing_info, difficulty_level, target_type, usage_availability,
+          pricing_info, difficulty_level, usage_availability,
           nationality, ai_status, is_visible, is_step_pick
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          ai_name, ai_name_en, ai_description, ai_type, ai_website, ai_logo,
+          ai_name, ai_name_en, ai_description, ai_website, ai_logo,
           company_name, company_name_en, embedded_video_url, headquarters,
-          main_features, target_users, use_cases, similar_services,
-          pricing_model, pricing_info, difficulty_level, target_type, usage_availability,
+          pricing_info, difficulty_level, usage_availability,
           nationality, 'active', is_visible, is_step_pick
         ]
       );
       
       const serviceId = result.insertId;
+      
+      // AI 타입 처리
+      if (ai_type_ids && Array.isArray(ai_type_ids)) {
+        for (const typeId of ai_type_ids) {
+          await connection.execute(
+            'INSERT IGNORE INTO ai_service_types (ai_service_id, ai_type_id) VALUES (?, ?)',
+            [serviceId, typeId]
+          );
+        }
+      }
+      
+      // 가격 모델 처리
+      if (pricing_model_ids && Array.isArray(pricing_model_ids)) {
+        for (const modelId of pricing_model_ids) {
+          await connection.execute(
+            'INSERT IGNORE INTO ai_service_pricing_models (ai_service_id, pricing_model_id) VALUES (?, ?)',
+            [serviceId, modelId]
+          );
+        }
+      }
+      
+      // 타겟 타입 처리
+      if (target_type_ids && Array.isArray(target_type_ids)) {
+        for (const targetId of target_type_ids) {
+          await connection.execute(
+            'INSERT IGNORE INTO ai_service_target_types (ai_service_id, target_type_id) VALUES (?, ?)',
+            [serviceId, targetId]
+          );
+        }
+      }
+      
+      // 콘텐츠 처리
+      if (contents && Array.isArray(contents)) {
+        for (const content of contents) {
+          if (content.content_text && content.content_text.trim()) {
+            await connection.execute(
+              'INSERT INTO ai_service_contents (ai_service_id, content_type, content_title, content_text, content_order) VALUES (?, ?, ?, ?, ?)',
+              [serviceId, content.content_type, content.content_title, content.content_text, content.content_order]
+            );
+          }
+        }
+      }
+      
+      // SNS 처리
+      if (sns && Array.isArray(sns)) {
+        for (const snsItem of sns) {
+          if (snsItem.sns_url && snsItem.sns_url.trim()) {
+            await connection.execute(
+              'INSERT INTO ai_service_sns (ai_service_id, sns_type, sns_url, sns_order) VALUES (?, ?, ?, ?)',
+              [serviceId, snsItem.sns_type, snsItem.sns_url, snsItem.sns_order]
+            );
+          }
+        }
+      }
       
       // 유사 서비스 관계 처리
       if (similar_service_ids && Array.isArray(similar_service_ids)) {
@@ -634,6 +745,11 @@ router.post('/', async (req, res) => {
           await connection.execute(
             'INSERT IGNORE INTO ai_service_tags (ai_service_id, tag_id) VALUES (?, ?)',
             [serviceId, tagId]
+          );
+          // 태그 사용 횟수 증가
+          await connection.execute(
+            'UPDATE tags SET tag_count = tag_count + 1 WHERE id = ?',
+            [tagId]
           );
         }
       }
@@ -665,7 +781,8 @@ router.post('/', async (req, res) => {
     console.error('Error creating AI service:', error);
     res.status(500).json({
       success: false,
-      error: 'AI 서비스 생성 중 오류가 발생했습니다.'
+      error: 'AI 서비스 생성 중 오류가 발생했습니다.',
+      details: error.message
     });
   }
 });
@@ -763,31 +880,89 @@ router.put('/:id', async (req, res) => {
       await connection.beginTransaction();
       
       const {
-        ai_name, ai_name_en, ai_description, ai_type, ai_website, ai_logo,
+        ai_name, ai_name_en, ai_description, ai_website, ai_logo,
         company_name, company_name_en, embedded_video_url, headquarters,
-        main_features, target_users, use_cases, similar_services,
-        pricing_model, pricing_info, difficulty_level, target_type, usage_availability,
+        pricing_info, difficulty_level, usage_availability,
         nationality, is_visible, is_step_pick, categories, contents, sns,
-        similar_service_ids, selected_tags
+        similar_service_ids, selected_tags, ai_type_ids, pricing_model_ids, target_type_ids
       } = req.body;
       
-      // AI 서비스 수정
+      // AI 서비스 수정 (새로운 스키마에 맞게)
       await connection.execute(
         `UPDATE ai_services SET
-          ai_name = ?, ai_name_en = ?, ai_description = ?, ai_type = ?, ai_website = ?, ai_logo = ?,
+          ai_name = ?, ai_name_en = ?, ai_description = ?, ai_website = ?, ai_logo = ?,
           company_name = ?, company_name_en = ?, embedded_video_url = ?, headquarters = ?,
-          main_features = ?, target_users = ?, use_cases = ?, similar_services = ?,
-          pricing_model = ?, pricing_info = ?, difficulty_level = ?, target_type = ?, usage_availability = ?,
+          pricing_info = ?, difficulty_level = ?, usage_availability = ?,
           nationality = ?, is_visible = ?, is_step_pick = ?, updated_at = NOW()
          WHERE id = ?`,
         [
-          ai_name, ai_name_en, ai_description, ai_type, ai_website, ai_logo,
+          ai_name, ai_name_en, ai_description, ai_website, ai_logo,
           company_name, company_name_en, embedded_video_url, headquarters,
-          main_features, target_users, use_cases, similar_services,
-          pricing_model, pricing_info, difficulty_level, target_type, usage_availability,
+          pricing_info, difficulty_level, usage_availability,
           nationality, is_visible, is_step_pick, id
         ]
       );
+      
+      // 기존 관계 데이터 삭제
+      await connection.execute('DELETE FROM ai_service_types WHERE ai_service_id = ?', [id]);
+      await connection.execute('DELETE FROM ai_service_pricing_models WHERE ai_service_id = ?', [id]);
+      await connection.execute('DELETE FROM ai_service_target_types WHERE ai_service_id = ?', [id]);
+      await connection.execute('DELETE FROM ai_service_contents WHERE ai_service_id = ?', [id]);
+      await connection.execute('DELETE FROM ai_service_sns WHERE ai_service_id = ?', [id]);
+      
+      // AI 타입 처리
+      if (ai_type_ids && Array.isArray(ai_type_ids)) {
+        for (const typeId of ai_type_ids) {
+          await connection.execute(
+            'INSERT IGNORE INTO ai_service_types (ai_service_id, ai_type_id) VALUES (?, ?)',
+            [id, typeId]
+          );
+        }
+      }
+      
+      // 가격 모델 처리
+      if (pricing_model_ids && Array.isArray(pricing_model_ids)) {
+        for (const modelId of pricing_model_ids) {
+          await connection.execute(
+            'INSERT IGNORE INTO ai_service_pricing_models (ai_service_id, pricing_model_id) VALUES (?, ?)',
+            [id, modelId]
+          );
+        }
+      }
+      
+      // 타겟 타입 처리
+      if (target_type_ids && Array.isArray(target_type_ids)) {
+        for (const targetId of target_type_ids) {
+          await connection.execute(
+            'INSERT IGNORE INTO ai_service_target_types (ai_service_id, target_type_id) VALUES (?, ?)',
+            [id, targetId]
+          );
+        }
+      }
+      
+      // 콘텐츠 처리
+      if (contents && Array.isArray(contents)) {
+        for (const content of contents) {
+          if (content.content_text && content.content_text.trim()) {
+            await connection.execute(
+              'INSERT INTO ai_service_contents (ai_service_id, content_type, content_title, content_text, content_order) VALUES (?, ?, ?, ?, ?)',
+              [id, content.content_type, content.content_title, content.content_text, content.content_order]
+            );
+          }
+        }
+      }
+      
+      // SNS 처리
+      if (sns && Array.isArray(sns)) {
+        for (const snsItem of sns) {
+          if (snsItem.sns_url && snsItem.sns_url.trim()) {
+            await connection.execute(
+              'INSERT INTO ai_service_sns (ai_service_id, sns_type, sns_url, sns_order) VALUES (?, ?, ?, ?)',
+              [id, snsItem.sns_type, snsItem.sns_url, snsItem.sns_order]
+            );
+          }
+        }
+      }
       
       // 기존 유사 서비스 관계 삭제
       await connection.execute(
@@ -847,7 +1022,8 @@ router.put('/:id', async (req, res) => {
     console.error('Error updating AI service:', error);
     res.status(500).json({
       success: false,
-      error: 'AI 서비스 수정 중 오류가 발생했습니다.'
+      error: 'AI 서비스 수정 중 오류가 발생했습니다.',
+      details: error.message
     });
   }
 });
