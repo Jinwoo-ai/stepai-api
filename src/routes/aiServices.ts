@@ -121,6 +121,137 @@ router.get('/search', async (req, res) => {
   }
 });
 
+// AI 서비스 개별 조회
+router.get('/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const include_categories = req.query['include_categories'] === 'true';
+    
+    if (isNaN(id)) {
+      return res.status(400).json({
+        success: false,
+        error: '유효하지 않은 서비스 ID입니다.'
+      });
+    }
+
+    const pool = getDatabaseConnection();
+    const connection = await pool.getConnection();
+    
+    try {
+      // AI 서비스 기본 정보 조회
+      const [services] = await connection.execute<RowDataPacket[]>(
+        'SELECT * FROM ai_services WHERE id = ? AND deleted_at IS NULL',
+        [id]
+      );
+      
+      if (services.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'AI 서비스를 찾을 수 없습니다.'
+        });
+      }
+      
+      let serviceData = { ...services[0] };
+      
+      // 카테고리 정보 포함
+      if (include_categories) {
+        const [categories] = await connection.execute<RowDataPacket[]>(
+          `SELECT c.id, c.category_name, c.parent_id, ac.is_main_category,
+                  p.category_name as parent_category_name
+           FROM categories c 
+           INNER JOIN ai_service_categories ac ON c.id = ac.category_id 
+           LEFT JOIN categories p ON c.parent_id = p.id
+           WHERE ac.ai_service_id = ?`,
+          [id]
+        );
+        serviceData['categories'] = categories;
+      }
+      
+      // 태그 정보 포함
+      const [tags] = await connection.execute<RowDataPacket[]>(
+        `SELECT t.id, t.tag_name
+         FROM tags t
+         INNER JOIN ai_service_tags ast ON t.id = ast.tag_id
+         WHERE ast.ai_service_id = ?
+         ORDER BY t.tag_name`,
+        [id]
+      );
+      serviceData['tags'] = tags.map(tag => tag['tag_name']).join(' #');
+      if (serviceData['tags']) serviceData['tags'] = '#' + serviceData['tags'];
+      serviceData['tag_ids'] = tags.map(tag => tag['id']);
+      
+      // AI 타입 정보 포함
+      const [aiTypes] = await connection.execute<RowDataPacket[]>(
+        `SELECT at.type_name
+         FROM ai_types at
+         INNER JOIN ai_service_types ast ON at.id = ast.ai_type_id
+         WHERE ast.ai_service_id = ?
+         ORDER BY at.type_name`,
+        [id]
+      );
+      serviceData['ai_types'] = aiTypes.map(type => type['type_name']);
+      serviceData['ai_type'] = aiTypes.map(type => type['type_name']).join(', ');
+      
+      // 가격 모델 정보 포함
+      const [pricingModels] = await connection.execute<RowDataPacket[]>(
+        `SELECT pm.model_name
+         FROM pricing_models pm
+         INNER JOIN ai_service_pricing_models aspm ON pm.id = aspm.pricing_model_id
+         WHERE aspm.ai_service_id = ?
+         ORDER BY pm.model_name`,
+        [id]
+      );
+      serviceData['pricing_models'] = pricingModels.map(model => model['model_name']);
+      
+      // 타겟 타입 정보 포함
+      const [targetTypes] = await connection.execute<RowDataPacket[]>(
+        `SELECT tt.type_code, tt.type_name
+         FROM target_types tt
+         INNER JOIN ai_service_target_types astt ON tt.id = astt.target_type_id
+         WHERE astt.ai_service_id = ?
+         ORDER BY tt.type_code`,
+        [id]
+      );
+      serviceData['target_types'] = targetTypes.map(type => ({ code: type['type_code'], name: type['type_name'] }));
+      
+      // 유사 서비스 정보 포함
+      const [similarServices] = await connection.execute<RowDataPacket[]>(
+        `SELECT s.id, s.ai_name, s.ai_logo, s.company_name
+         FROM ai_services s
+         INNER JOIN ai_service_similar_services ass ON s.id = ass.similar_service_id
+         WHERE ass.ai_service_id = ? AND s.deleted_at IS NULL
+         ORDER BY s.ai_name`,
+        [id]
+      );
+      serviceData['similar_services_list'] = similarServices;
+      
+      // 콘텐츠 정보 포함
+      const [contents] = await connection.execute<RowDataPacket[]>(
+        `SELECT content_type, content_title, content_text, content_order
+         FROM ai_service_contents
+         WHERE ai_service_id = ?
+         ORDER BY content_order`,
+        [id]
+      );
+      serviceData['contents'] = contents;
+      
+      res.json({
+        success: true,
+        data: serviceData
+      });
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Error fetching AI service:', error);
+    res.status(500).json({
+      success: false,
+      error: 'AI 서비스 조회 중 오류가 발생했습니다.',
+      details: error.message
+    });
+  }
+});
+
 // AI 서비스 목록 조회
 router.get('/', async (req, res) => {
   try {
@@ -865,6 +996,75 @@ router.delete('/:id/similar-services/:similarId', async (req, res) => {
     res.status(500).json({
       success: false,
       error: '유사 서비스 제거 중 오류가 발생했습니다.'
+    });
+  }
+});
+
+// AI 서비스 삭제
+router.delete('/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    
+    if (isNaN(id)) {
+      return res.status(400).json({
+        success: false,
+        error: '유효하지 않은 서비스 ID입니다.'
+      });
+    }
+
+    const pool = getDatabaseConnection();
+    const connection = await pool.getConnection();
+    
+    try {
+      await connection.beginTransaction();
+      
+      // 서비스 존재 확인
+      const [existingServices] = await connection.execute<RowDataPacket[]>(
+        'SELECT id FROM ai_services WHERE id = ? AND deleted_at IS NULL',
+        [id]
+      );
+      
+      if (existingServices.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'AI 서비스를 찾을 수 없습니다.'
+        });
+      }
+      
+      // 관련 데이터 삭제
+      await connection.execute('DELETE FROM ai_service_types WHERE ai_service_id = ?', [id]);
+      await connection.execute('DELETE FROM ai_service_pricing_models WHERE ai_service_id = ?', [id]);
+      await connection.execute('DELETE FROM ai_service_target_types WHERE ai_service_id = ?', [id]);
+      await connection.execute('DELETE FROM ai_service_contents WHERE ai_service_id = ?', [id]);
+      await connection.execute('DELETE FROM ai_service_sns WHERE ai_service_id = ?', [id]);
+      await connection.execute('DELETE FROM ai_service_similar_services WHERE ai_service_id = ? OR similar_service_id = ?', [id, id]);
+      await connection.execute('DELETE FROM ai_service_tags WHERE ai_service_id = ?', [id]);
+      await connection.execute('DELETE FROM ai_service_categories WHERE ai_service_id = ?', [id]);
+      
+      // 서비스 삭제 (소프트 삭제)
+      await connection.execute(
+        'UPDATE ai_services SET deleted_at = NOW() WHERE id = ?',
+        [id]
+      );
+      
+      await connection.commit();
+      
+      res.json({
+        success: true,
+        message: 'AI 서비스가 삭제되었습니다.'
+      });
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Error deleting AI service:', error);
+    res.status(500).json({
+      success: false,
+      error: 'AI 서비스 삭제 중 오류가 발생했습니다.',
+      details: error.message
     });
   }
 });
