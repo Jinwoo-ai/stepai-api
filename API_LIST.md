@@ -190,6 +190,140 @@
   - **설명**: AI 영상 소프트 삭제
   - **Response**: `{ success: true, message: string }`
 
+## 👥 회원관리 API
+- **POST** `/api/users/sns-login`
+  - **설명**: SNS 로그인/회원가입 (토큰 발급)
+  - **Body**: 
+    ```json
+    {
+      "sns_type": "naver" | "kakao" | "google",
+      "sns_user_id": "sns_12345",
+      "name": "김철수",
+      "email": "kim@naver.com",
+      "industry": "IT",
+      "job_role": "개발자",
+      "job_level": "대리",
+      "experience_years": 3
+    }
+    ```
+  - **Response**: 
+    ```json
+    {
+      "success": true,
+      "data": {
+        "user": {
+          "id": 1,
+          "name": "김철수",
+          "email": "kim@naver.com",
+          "industry": "IT",
+          "job_role": "개발자",
+          "job_level": "대리",
+          "experience_years": 3,
+          "sns_accounts": [
+            {
+              "sns_type": "naver",
+              "sns_user_id": "sns_12345"
+            }
+          ]
+        },
+        "token": "abc123...",
+        "expiresAt": "2024-02-15T10:00:00Z"
+      }
+    }
+    ```
+
+- **POST** `/api/users/logout`
+  - **설명**: 로그아웃 (토큰 무효화)
+  - **Headers**: `Authorization: Bearer {token}`
+  - **Response**: `{ success: true, message: string }`
+
+- **GET** `/api/users`
+  - **설명**: 회원 목록 조회 (관리자 전용)
+  - **Headers**: `Authorization: Bearer {token}`
+  - **Query Parameters**:
+    - `page`: 페이지 번호 (기본값: 1)
+    - `limit`: 페이지당 항목 수 (기본값: 20)
+    - `user_type`: 사용자 타입 필터 (member, admin)
+    - `user_status`: 사용자 상태 필터 (active, inactive)
+    - `sns_type`: SNS 타입 필터 (naver, kakao, google)
+    - `industry`: 업종 필터
+    - `job_role`: 직무 필터
+  - **Response**: 
+    ```json
+    {
+      "success": true,
+      "data": {
+        "data": [
+          {
+            "id": 1,
+            "name": "김철수",
+            "email": "kim@naver.com",
+            "industry": "IT",
+            "job_role": "개발자",
+            "job_level": "대리",
+            "experience_years": 3,
+            "user_type": "member",
+            "user_status": "active",
+            "created_at": "2024-01-15T10:00:00Z",
+            "sns_accounts": [
+              {
+                "sns_type": "naver",
+                "sns_user_id": "sns_12345"
+              }
+            ]
+          }
+        ],
+        "pagination": {
+          "page": 1,
+          "limit": 20,
+          "total": 100,
+          "totalPages": 5
+        }
+      }
+    }
+    ```
+
+- **GET** `/api/users/{id}`
+  - **설명**: 회원 상세 조회
+  - **Headers**: `Authorization: Bearer {token}`
+  - **Response**: `{ success: true, data: User }`
+
+- **PUT** `/api/users/{id}`
+  - **설명**: 회원 정보 수정
+  - **Headers**: `Authorization: Bearer {token}`
+  - **Body**: 
+    ```json
+    {
+      "name": "김철수",
+      "industry": "IT",
+      "job_role": "시니어 개발자",
+      "job_level": "과장",
+      "experience_years": 5,
+      "user_status": "active"
+    }
+    ```
+  - **Response**: `{ success: true, data: User, message: string }`
+
+- **DELETE** `/api/users/{id}`
+  - **설명**: 회원 삭제 (소프트 삭제)
+  - **Headers**: `Authorization: Bearer {token}`
+  - **Response**: `{ success: true, message: string }`
+
+- **GET** `/api/users/stats/overview`
+  - **설명**: 회원 통계 조회
+  - **Headers**: `Authorization: Bearer {token}`
+  - **Response**: 
+    ```json
+    {
+      "success": true,
+      "data": {
+        "total_users": 1250,
+        "active_users": 1180,
+        "today_signups": 15
+      }
+    }
+    ```
+
 ## 🤝 광고제휴 관리 API
 - **GET** `/api/ad-partnerships`
   - **Query Parameters**:
@@ -386,6 +520,36 @@ interface Category {
   created_at: string;
   updated_at: string;
   children?: Category[];
+}
+```
+
+### User 객체
+```typescript
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  industry?: string;
+  job_role?: string;
+  job_level?: string;
+  experience_years?: number;
+  user_type: 'member' | 'admin';
+  user_status: 'active' | 'inactive' | 'pending' | 'deleted';
+  created_at: string;
+  updated_at: string;
+}
+
+interface UserSns {
+  id: number;
+  user_id: number;
+  sns_type: 'naver' | 'kakao' | 'google';
+  sns_user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface UserWithSns extends User {
+  sns_accounts?: UserSns[];
 }
 ```
 

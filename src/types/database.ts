@@ -3,14 +3,30 @@
 // 기본 타입들
 export interface User {
   id: number;
-  username: string;
+  name: string;
   email: string;
-  password_hash: string;
+  industry?: string;
+  job_role?: string;
+  job_level?: string;
+  experience_years?: number;
   user_type: 'member' | 'admin';
   user_status: 'active' | 'inactive' | 'pending' | 'deleted';
   deleted_at?: Date;
   created_at: Date;
   updated_at: Date;
+}
+
+export interface UserSns {
+  id: number;
+  user_id: number;
+  sns_type: 'naver' | 'kakao' | 'google';
+  sns_user_id: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface UserWithSns extends User {
+  sns_accounts?: UserSns[];
 }
 
 export interface AIService {
@@ -187,15 +203,24 @@ export interface PaginatedResponse<T> {
 
 // Users 관련 타입들
 export interface UserCreateRequest {
-  username: string;
+  name: string;
   email: string;
-  password: string;
+  industry?: string;
+  job_role?: string;
+  job_level?: string;
+  experience_years?: number;
+  sns_type: 'naver' | 'kakao' | 'google';
+  sns_user_id: string;
   user_type?: 'member' | 'admin';
 }
 
 export interface UserUpdateRequest {
-  username?: string;
+  name?: string;
   email?: string;
+  industry?: string;
+  job_role?: string;
+  job_level?: string;
+  experience_years?: number;
   user_type?: 'member' | 'admin';
   user_status?: 'active' | 'inactive' | 'pending' | 'deleted';
 }
@@ -203,6 +228,9 @@ export interface UserUpdateRequest {
 export interface UserFilters {
   user_type?: string;
   user_status?: string;
+  sns_type?: string;
+  industry?: string;
+  job_role?: string;
 }
 
 // AI Services 관련 타입들
@@ -533,4 +561,16 @@ export interface AdPartnershipFilters {
   inquiry_status?: string;
   date_from?: Date;
   date_to?: Date;
+}
+
+// SNS 로그인 관련 타입들
+export interface SnsLoginRequest {
+  sns_type: 'naver' | 'kakao' | 'google';
+  sns_user_id: string;
+  name: string;
+  email: string;
+  industry?: string;
+  job_role?: string;
+  job_level?: string;
+  experience_years?: number;
 }

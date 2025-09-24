@@ -298,6 +298,151 @@ GET /api/dashboard/stats
 }
 ```
 
+## 👥 회원관리 API
+
+### 1. SNS 로그인/회원가입
+```http
+POST /api/users/sns-login
+```
+**설명**: SNS 계정으로 로그인 또는 회원가입 및 액세스 토큰 발급
+
+**Request Body**:
+```json
+{
+  "sns_type": "naver",
+  "sns_user_id": "naver_12345",
+  "name": "김철수",
+  "email": "kim@naver.com",
+  "industry": "IT",
+  "job_role": "개발자",
+  "job_level": "대리",
+  "experience_years": 3
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": 1,
+      "name": "김철수",
+      "email": "kim@naver.com",
+      "industry": "IT",
+      "job_role": "개발자",
+      "job_level": "대리",
+      "experience_years": 3,
+      "user_type": "member",
+      "user_status": "active",
+      "created_at": "2024-01-15T10:00:00Z",
+      "sns_accounts": [
+        {
+          "sns_type": "naver",
+          "sns_user_id": "naver_12345"
+        }
+      ]
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expiresAt": "2024-02-15T10:00:00Z"
+  },
+  "message": "SNS 로그인이 성공적으로 처리되었습니다."
+}
+```
+
+### 2. 로그아웃
+```http
+POST /api/users/logout
+```
+**설명**: 사용자 로그아웃 및 토큰 무효화
+
+**Headers**:
+```
+Authorization: Bearer {access_token}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "로그아웃이 성공적으로 처리되었습니다."
+}
+```
+
+### 3. 내 정보 조회
+```http
+GET /api/users/me
+```
+**설명**: 현재 로그인한 사용자의 정보 조회
+
+**Headers**:
+```
+Authorization: Bearer {access_token}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "김철수",
+    "email": "kim@naver.com",
+    "industry": "IT",
+    "job_role": "개발자",
+    "job_level": "대리",
+    "experience_years": 3,
+    "user_type": "member",
+    "user_status": "active",
+    "created_at": "2024-01-15T10:00:00Z",
+    "sns_accounts": [
+      {
+        "sns_type": "naver",
+        "sns_user_id": "naver_12345"
+      }
+    ]
+  }
+}
+```
+
+### 4. 내 정보 수정
+```http
+PUT /api/users/me
+```
+**설명**: 현재 로그인한 사용자의 정보 수정
+
+**Headers**:
+```
+Authorization: Bearer {access_token}
+```
+
+**Request Body**:
+```json
+{
+  "name": "김철수",
+  "industry": "IT",
+  "job_role": "시니어 개발자",
+  "job_level": "과장",
+  "experience_years": 5
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "김철수",
+    "industry": "IT",
+    "job_role": "시니어 개발자",
+    "job_level": "과장",
+    "experience_years": 5
+  },
+  "message": "사용자 정보가 성공적으로 수정되었습니다."
+}
+```
+
 ## 🤝 광고제휴 API
 
 ### 1. 광고제휴 문의 등록
@@ -813,6 +958,33 @@ interface Pagination {
   limit: number;
   total: number;
   totalPages: number;
+}
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  industry?: string;
+  job_role?: string;
+  job_level?: string;
+  experience_years?: number;
+  user_type: 'member' | 'admin';
+  user_status: 'active' | 'inactive' | 'pending' | 'deleted';
+  created_at: string;
+  updated_at: string;
+}
+
+interface UserSns {
+  id: number;
+  user_id: number;
+  sns_type: 'naver' | 'kakao' | 'google';
+  sns_user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface UserWithSns extends User {
+  sns_accounts?: UserSns[];
 }
 
 interface AdPartnership {

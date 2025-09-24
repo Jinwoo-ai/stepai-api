@@ -1,369 +1,265 @@
-import { getDatabaseConnection } from '../configs/database';
-import { User, UserCreateRequest, UserUpdateRequest, UserFilters, PaginationParams, ApiResponse, PaginatedResponse } from '../types/database';
-import bcrypt from 'bcrypt';
+import mysql from 'mysql2/promise';
+import { dbConfig } from '../configs/database';
+import { TokenService } from '../utils/jwt';
+import { 
+  User, 
+  UserSns,
+  UserWithSns,
+  UserCreateRequest, 
+  UserUpdateRequest, 
+  UserFilters,
+  PaginatedResponse,
+  PaginationParams,
+  SnsLoginRequest
+} from '../types/database';
 
-class UserService {
-  private pool = getDatabaseConnection();
+interface LoginResponse {
+  user: UserWithSns;
+  token: string;
+  expiresAt: Date;
+}
 
-  // 사용자 생성
-  async createUser(userData: UserCreateRequest): Promise<ApiResponse<User>> {
-    try {
-      const connection = await this.pool.getConnection();
-      
-      try {
-        // 이메일 중복 확인
-        const [existingUsers] = await connection.execute(
-          'SELECT id FROM users WHERE email = ? AND deleted_at IS NULL',
-          [userData.email]
-        );
-
-        if ((existingUsers as any[]).length > 0) {
-          return {
-            success: false,
-            error: '이미 존재하는 이메일입니다.'
-          };
-        }
-
-        // 비밀번호 해시화
-        const saltRounds = 10;
-        const passwordHash = await bcrypt.hash(userData.password, saltRounds);
-
-        // 사용자 생성
-        const [result] = await connection.execute(
-          `INSERT INTO users (username, email, password_hash, user_type) 
-           VALUES (?, ?, ?, ?)`,
-          [userData.username, userData.email, passwordHash, userData.user_type || 'client']
-        );
-
-        const userId = (result as any).insertId;
-
-        // 생성된 사용자 조회
-        const [users] = await connection.execute(
-          'SELECT * FROM users WHERE id = ?',
-          [userId]
-        );
-
-        const user = (users as any[])[0];
-
-        return {
-          success: true,
-          data: user,
-          message: '사용자가 성공적으로 생성되었습니다.'
-        };
-      } finally {
-        connection.release();
-      }
-    } catch (error) {
-      console.error('사용자 생성 오류:', error);
-      return {
-        success: false,
-        error: '사용자 생성 중 오류가 발생했습니다.'
-      };
-    }
+export class UserService {
+  private async getConnection() {
+    return await mysql.createConnection(dbConfig);
   }
 
-  // ID로 사용자 조회
-  async getUserById(id: number): Promise<ApiResponse<User>> {
+  // SNS 로그인/회원가입
+  async snsLogin(data: SnsLoginRequest): Promise<LoginResponse> {
+    const connection = await this.getConnection();
     try {
-      const connection = await this.pool.getConnection();
-      
-      try {
-        const [users] = await connection.execute(
-          'SELECT * FROM users WHERE id = ? AND deleted_at IS NULL',
-          [id]
+      // 기존 SNS 계정 확인
+      const [snsRows] = await connection.execute(
+        'SELECT user_id FROM user_sns WHERE sns_type = ? AND sns_user_id = ?',
+        [data.sns_type, data.sns_user_id]
+      );
+
+      let userId: number;
+
+      if ((snsRows as any[]).length > 0) {
+        // 기존 사용자
+        userId = (snsRows as any[])[0].user_id;
+      } else {
+        // 새 사용자 생성
+        const [userResult] = await connection.execute(
+          `INSERT INTO users (name, email, industry, job_role, job_level, experience_years) 
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [data.name, data.email, data.industry, data.job_role, data.job_level, data.experience_years]
         );
 
-        if ((users as any[]).length === 0) {
-          return {
-            success: false,
-            error: '사용자를 찾을 수 없습니다.'
-          };
-        }
+        userId = (userResult as any).insertId;
 
-        return {
-          success: true,
-          data: (users as any[])[0]
-        };
-      } finally {
-        connection.release();
-      }
-    } catch (error) {
-      console.error('사용자 조회 오류:', error);
-      return {
-        success: false,
-        error: '사용자 조회 중 오류가 발생했습니다.'
-      };
-    }
-  }
-
-  // 사용자 목록 조회
-  async getUsers(params: PaginationParams, filters: UserFilters = {}): Promise<ApiResponse<PaginatedResponse<User>>> {
-    try {
-      const connection = await this.pool.getConnection();
-      
-      try {
-        const { page, limit } = params;
-        const offset = (page - 1) * limit;
-
-        // WHERE 조건 구성
-        const whereConditions: string[] = ['deleted_at IS NULL'];
-        const queryParams: any[] = [];
-
-        if (filters.user_type) {
-          whereConditions.push('user_type = ?');
-          queryParams.push(filters.user_type);
-        }
-
-        if (filters.user_status) {
-          whereConditions.push('user_status = ?');
-          queryParams.push(filters.user_status);
-        }
-
-        const whereClause = whereConditions.join(' AND ');
-
-        // 전체 개수 조회
-        const [countResult] = await connection.execute(
-          `SELECT COUNT(*) as total FROM users WHERE ${whereClause}`,
-          queryParams
-        );
-
-        const total = (countResult as any[])[0].total;
-        const totalPages = Math.ceil(total / limit);
-
-        // 사용자 목록 조회
-        const [users] = await connection.execute(
-          `SELECT * FROM users WHERE ${whereClause} 
-           ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-          [...queryParams, limit, offset]
-        );
-
-        return {
-          success: true,
-          data: {
-            data: users as User[],
-            pagination: {
-              page,
-              limit,
-              total,
-              totalPages
-            }
-          }
-        };
-      } finally {
-        connection.release();
-      }
-    } catch (error) {
-      console.error('사용자 목록 조회 오류:', error);
-      return {
-        success: false,
-        error: '사용자 목록 조회 중 오류가 발생했습니다.'
-      };
-    }
-  }
-
-  // 사용자 정보 수정
-  async updateUser(id: number, userData: UserUpdateRequest): Promise<ApiResponse<User>> {
-    try {
-      const connection = await this.pool.getConnection();
-      
-      try {
-        // 사용자 존재 확인
-        const [existingUsers] = await connection.execute(
-          'SELECT id FROM users WHERE id = ? AND deleted_at IS NULL',
-          [id]
-        );
-
-        if ((existingUsers as any[]).length === 0) {
-          return {
-            success: false,
-            error: '사용자를 찾을 수 없습니다.'
-          };
-        }
-
-        // 업데이트할 필드 구성
-        const updateFields: string[] = [];
-        const updateParams: any[] = [];
-
-        if (userData.username) {
-          updateFields.push('username = ?');
-          updateParams.push(userData.username);
-        }
-
-        if (userData.email) {
-          updateFields.push('email = ?');
-          updateParams.push(userData.email);
-        }
-
-        if (userData.user_type) {
-          updateFields.push('user_type = ?');
-          updateParams.push(userData.user_type);
-        }
-
-        if (userData.user_status) {
-          updateFields.push('user_status = ?');
-          updateParams.push(userData.user_status);
-        }
-
-        if (updateFields.length === 0) {
-          return {
-            success: false,
-            error: '수정할 데이터가 없습니다.'
-          };
-        }
-
-        // 사용자 정보 업데이트
+        // SNS 정보 저장
         await connection.execute(
-          `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`,
-          [...updateParams, id]
+          'INSERT INTO user_sns (user_id, sns_type, sns_user_id) VALUES (?, ?, ?)',
+          [userId, data.sns_type, data.sns_user_id]
         );
-
-        // 업데이트된 사용자 조회
-        const [users] = await connection.execute(
-          'SELECT * FROM users WHERE id = ?',
-          [id]
-        );
-
-        return {
-          success: true,
-          data: (users as any[])[0],
-          message: '사용자 정보가 성공적으로 수정되었습니다.'
-        };
-      } finally {
-        connection.release();
       }
-    } catch (error) {
-      console.error('사용자 수정 오류:', error);
+
+      // 액세스 토큰 생성
+      const { token, expiresAt } = TokenService.generateToken();
+      await connection.execute(
+        'INSERT INTO access_tokens (user_id, token, expires_at) VALUES (?, ?, ?)',
+        [userId, token, expiresAt]
+      );
+
+      const user = await this.getById(userId);
+      return { user, token, expiresAt };
+    } finally {
+      await connection.end();
+    }
+  }
+
+  // ID로 사용자 조회 (SNS 정보 포함)
+  async getById(id: number): Promise<UserWithSns> {
+    const connection = await this.getConnection();
+    try {
+      const [userRows] = await connection.execute(
+        'SELECT * FROM users WHERE id = ? AND deleted_at IS NULL',
+        [id]
+      );
+      
+      const users = userRows as User[];
+      if (users.length === 0) {
+        throw new Error('사용자를 찾을 수 없습니다.');
+      }
+
+      const [snsRows] = await connection.execute(
+        'SELECT * FROM user_sns WHERE user_id = ?',
+        [id]
+      );
+
+      const user = users[0] as UserWithSns;
+      user.sns_accounts = snsRows as UserSns[];
+      
+      return user;
+    } finally {
+      await connection.end();
+    }
+  }
+
+  // 사용자 목록 조회 (페이지네이션)
+  async getList(
+    pagination: PaginationParams,
+    filters: UserFilters = {}
+  ): Promise<PaginatedResponse<UserWithSns>> {
+    const connection = await this.getConnection();
+    try {
+      let whereClause = 'WHERE u.deleted_at IS NULL';
+      const params: any[] = [];
+
+      if (filters.user_type) {
+        whereClause += ' AND u.user_type = ?';
+        params.push(filters.user_type);
+      }
+
+      if (filters.user_status) {
+        whereClause += ' AND u.user_status = ?';
+        params.push(filters.user_status);
+      }
+
+      if (filters.sns_type) {
+        whereClause += ' AND s.sns_type = ?';
+        params.push(filters.sns_type);
+      }
+
+      if (filters.industry) {
+        whereClause += ' AND u.industry = ?';
+        params.push(filters.industry);
+      }
+
+      if (filters.job_role) {
+        whereClause += ' AND u.job_role = ?';
+        params.push(filters.job_role);
+      }
+
+      // 총 개수 조회
+      const [countRows] = await connection.execute(
+        `SELECT COUNT(DISTINCT u.id) as total 
+         FROM users u 
+         LEFT JOIN user_sns s ON u.id = s.user_id 
+         ${whereClause}`,
+        params
+      );
+      const total = (countRows as any)[0].total;
+
+      // 데이터 조회
+      const offset = (pagination.page - 1) * pagination.limit;
+      const [rows] = await connection.execute(
+        `SELECT u.*, 
+                GROUP_CONCAT(CONCAT(s.sns_type, ':', s.sns_user_id) SEPARATOR ',') as sns_info
+         FROM users u 
+         LEFT JOIN user_sns s ON u.id = s.user_id 
+         ${whereClause}
+         GROUP BY u.id
+         ORDER BY u.created_at DESC 
+         LIMIT ? OFFSET ?`,
+        [...params, pagination.limit, offset]
+      );
+
+      const users = (rows as any[]).map(row => {
+        const user = { ...row } as UserWithSns;
+        if (row.sns_info) {
+          user.sns_accounts = row.sns_info.split(',').map((info: string) => {
+            const [sns_type, sns_user_id] = info.split(':');
+            return { sns_type, sns_user_id };
+          });
+        } else {
+          user.sns_accounts = [];
+        }
+        delete (user as any).sns_info;
+        return user;
+      });
+
       return {
-        success: false,
-        error: '사용자 수정 중 오류가 발생했습니다.'
+        data: users,
+        pagination: {
+          page: pagination.page,
+          limit: pagination.limit,
+          total,
+          totalPages: Math.ceil(total / pagination.limit)
+        }
       };
+    } finally {
+      await connection.end();
+    }
+  }
+
+  // 사용자 수정
+  async update(id: number, data: UserUpdateRequest): Promise<UserWithSns> {
+    const connection = await this.getConnection();
+    try {
+      const updateFields: string[] = [];
+      const params: any[] = [];
+
+      Object.entries(data).forEach(([key, value]) => {
+        if (value !== undefined) {
+          updateFields.push(`${key} = ?`);
+          params.push(value);
+        }
+      });
+
+      if (updateFields.length === 0) {
+        throw new Error('수정할 데이터가 없습니다.');
+      }
+
+      params.push(id);
+
+      await connection.execute(
+        `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`,
+        params
+      );
+
+      return await this.getById(id);
+    } finally {
+      await connection.end();
     }
   }
 
   // 사용자 삭제 (소프트 삭제)
-  async deleteUser(id: number): Promise<ApiResponse<void>> {
+  async delete(id: number): Promise<void> {
+    const connection = await this.getConnection();
     try {
-      const connection = await this.pool.getConnection();
-      
-      try {
-        // 사용자 존재 확인
-        const [existingUsers] = await connection.execute(
-          'SELECT id FROM users WHERE id = ? AND deleted_at IS NULL',
-          [id]
-        );
-
-        if ((existingUsers as any[]).length === 0) {
-          return {
-            success: false,
-            error: '사용자를 찾을 수 없습니다.'
-          };
-        }
-
-        // 소프트 삭제
-        await connection.execute(
-          'UPDATE users SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?',
-          [id]
-        );
-
-        return {
-          success: true,
-          message: '사용자가 성공적으로 삭제되었습니다.'
-        };
-      } finally {
-        connection.release();
-      }
-    } catch (error) {
-      console.error('사용자 삭제 오류:', error);
-      return {
-        success: false,
-        error: '사용자 삭제 중 오류가 발생했습니다.'
-      };
+      await connection.execute(
+        'UPDATE users SET deleted_at = NOW() WHERE id = ?',
+        [id]
+      );
+    } finally {
+      await connection.end();
     }
   }
 
-  // 사용자 검색
-  async searchUsers(searchTerm: string): Promise<ApiResponse<User[]>> {
+  // 토큰 무효화 (로그아웃)
+  async logout(token: string): Promise<void> {
+    const connection = await this.getConnection();
     try {
-      const connection = await this.pool.getConnection();
-      
-      try {
-        const [users] = await connection.execute(
-          `SELECT * FROM users 
-           WHERE (username LIKE ? OR email LIKE ?) 
-           AND deleted_at IS NULL 
-           ORDER BY created_at DESC`,
-          [`%${searchTerm}%`, `%${searchTerm}%`]
-        );
-
-        return {
-          success: true,
-          data: users as User[]
-        };
-      } finally {
-        connection.release();
-      }
-    } catch (error) {
-      console.error('사용자 검색 오류:', error);
-      return {
-        success: false,
-        error: '사용자 검색 중 오류가 발생했습니다.'
-      };
+      await connection.execute(
+        'DELETE FROM access_tokens WHERE token = ?',
+        [token]
+      );
+    } finally {
+      await connection.end();
     }
   }
 
-  // 사용자 통계 조회
-  async getUserStats(): Promise<ApiResponse<any>> {
+  // 통계
+  async getStats(): Promise<Record<string, number>> {
+    const connection = await this.getConnection();
     try {
-      const connection = await this.pool.getConnection();
-      
-      try {
-        // 전체 사용자 수
-        const [totalResult] = await connection.execute(
-          'SELECT COUNT(*) as total FROM users WHERE deleted_at IS NULL'
-        );
+      const [rows] = await connection.execute(`
+        SELECT 
+          COUNT(*) as total_users,
+          COUNT(CASE WHEN user_status = 'active' THEN 1 END) as active_users,
+          COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) as today_signups
+        FROM users 
+        WHERE deleted_at IS NULL
+      `);
 
-        // 사용자 타입별 통계
-        const [typeStats] = await connection.execute(
-          `SELECT user_type, COUNT(*) as count 
-           FROM users WHERE deleted_at IS NULL 
-           GROUP BY user_type`
-        );
-
-        // 사용자 상태별 통계
-        const [statusStats] = await connection.execute(
-          `SELECT user_status, COUNT(*) as count 
-           FROM users WHERE deleted_at IS NULL 
-           GROUP BY user_status`
-        );
-
-        // 최근 가입자 수 (최근 30일)
-        const [recentResult] = await connection.execute(
-          `SELECT COUNT(*) as recent 
-           FROM users 
-           WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) 
-           AND deleted_at IS NULL`
-        );
-
-        return {
-          success: true,
-          data: {
-            total: (totalResult as any[])[0].total,
-            typeStats: typeStats as any[],
-            statusStats: statusStats as any[],
-            recentUsers: (recentResult as any[])[0].recent
-          }
-        };
-      } finally {
-        connection.release();
-      }
-    } catch (error) {
-      console.error('사용자 통계 조회 오류:', error);
-      return {
-        success: false,
-        error: '사용자 통계 조회 중 오류가 발생했습니다.'
-      };
+      return (rows as any[])[0];
+    } finally {
+      await connection.end();
     }
   }
 }
 
-export default new UserService(); 
+export const userService = new UserService();

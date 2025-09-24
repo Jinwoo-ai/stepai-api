@@ -128,7 +128,12 @@ export class AdPartnershipService {
       Object.entries(data).forEach(([key, value]) => {
         if (value !== undefined) {
           updateFields.push(`${key} = ?`);
-          params.push(value);
+          // ISO 날짜 문자열을 MySQL DATETIME 형식으로 변환
+          if (key === 'response_date' && typeof value === 'string') {
+            params.push(new Date(value).toISOString().slice(0, 19).replace('T', ' '));
+          } else {
+            params.push(value);
+          }
         }
       });
 

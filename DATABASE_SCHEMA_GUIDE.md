@@ -37,20 +37,61 @@ StepAI API는 AI 서비스 소개 및 이용방법 추천 서비스를 위한 �
 ```sql
 CREATE TABLE users (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  username VARCHAR(50) NOT NULL,
-  email VARCHAR(100) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  user_type VARCHAR(20) DEFAULT 'member', -- member, admin
-  user_status VARCHAR(20) DEFAULT 'active', -- active, inactive, pending, deleted
+  name VARCHAR(50) NOT NULL COMMENT '이름',
+  email VARCHAR(100) UNIQUE NOT NULL COMMENT '이메일',
+  industry VARCHAR(50) COMMENT '업종',
+  job_role VARCHAR(50) COMMENT '직무',
+  job_level VARCHAR(30) COMMENT '직급',
+  experience_years INT COMMENT '연차',
+  user_type VARCHAR(20) DEFAULT 'member' COMMENT '사용자 타입',
+  user_status VARCHAR(20) DEFAULT 'active' COMMENT '사용자 상태',
   deleted_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_email (email),
+  INDEX idx_type_status (user_type, user_status),
+  INDEX idx_industry (industry),
+  INDEX idx_job_role (job_role)
+);
+```
+
+### User SNS (SNS 로그인 정보)
+```sql
+CREATE TABLE user_sns (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  sns_type VARCHAR(20) NOT NULL COMMENT 'SNS 종류',
+  sns_user_id VARCHAR(100) NOT NULL COMMENT 'SNS 사용자 ID',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_sns_user (sns_type, sns_user_id),
+  INDEX idx_user_id (user_id),
+  INDEX idx_sns_type (sns_type)
+);
+```
+
+### Access Tokens (액세스 토큰)
+```sql
+CREATE TABLE access_tokens (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  token VARCHAR(255) NOT NULL UNIQUE COMMENT '액세스 토큰',
+  expires_at TIMESTAMP NOT NULL COMMENT '만료일시',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_token (token),
+  INDEX idx_user_id (user_id),
+  INDEX idx_expires_at (expires_at)
 );
 ```
 
 **주요 특징:**
+- SNS 로그인 기반 인증 시스템
+- 네이버, 카카오, 구글 SNS 지원
+- 30일 만료 액세스 토큰
+- 업종, 직무, 직급, 연차 정보 관리
 - 소프트 삭제 지원 (`deleted_at`)
-- 단순화된 사용자 타입 (member, admin)
 - 이메일 중복 방지
 
 ## 🤖 AI 서비스 및 영상 테이블
