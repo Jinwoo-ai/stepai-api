@@ -475,3 +475,62 @@ export interface FileUploadResponse {
   };
   error?: string;
 }
+
+// 광고제휴 관련 타입들
+export interface AdPartnership {
+  id: number;
+  company_name: string;
+  contact_person: string;
+  contact_email: string;
+  contact_phone?: string;
+  partnership_type: string;
+  budget_range?: string;
+  campaign_period?: string;
+  target_audience?: string;
+  campaign_description?: string;
+  additional_requirements?: string;
+  attachment_url?: string;
+  inquiry_status: 'pending' | 'reviewing' | 'approved' | 'rejected' | 'completed';
+  admin_notes?: string;
+  response_date?: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface AdPartnershipCreateRequest {
+  company_name: string;
+  contact_person: string;
+  contact_email: string;
+  contact_phone?: string;
+  partnership_type: string;
+  budget_range?: string;
+  campaign_period?: string;
+  target_audience?: string;
+  campaign_description?: string;
+  additional_requirements?: string;
+  attachment_url?: string;
+}
+
+export interface AdPartnershipUpdateRequest {
+  company_name?: string;
+  contact_person?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  partnership_type?: string;
+  budget_range?: string;
+  campaign_period?: string;
+  target_audience?: string;
+  campaign_description?: string;
+  additional_requirements?: string;
+  attachment_url?: string;
+  inquiry_status?: 'pending' | 'reviewing' | 'approved' | 'rejected' | 'completed';
+  admin_notes?: string;
+  response_date?: Date;
+}
+
+export interface AdPartnershipFilters {
+  partnership_type?: string;
+  inquiry_status?: string;
+  date_from?: Date;
+  date_to?: Date;
+}

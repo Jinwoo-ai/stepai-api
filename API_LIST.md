@@ -190,6 +190,73 @@
   - **설명**: AI 영상 소프트 삭제
   - **Response**: `{ success: true, message: string }`
 
+## 🤝 광고제휴 관리 API
+- **GET** `/api/ad-partnerships`
+  - **Query Parameters**:
+    - `page`: 페이지 번호 (기본값: 1)
+    - `limit`: 페이지당 항목 수 (기본값: 10)
+    - `partnership_type`: 제휴 유형 필터
+    - `inquiry_status`: 문의 상태 필터 (pending, reviewing, approved, rejected, completed)
+    - `date_from`: 시작 날짜 필터
+    - `date_to`: 종료 날짜 필터
+  - **Response**: 
+    ```json
+    {
+      "success": true,
+      "data": {
+        "data": AdPartnership[],
+        "pagination": PaginationInfo
+      }
+    }
+    ```
+
+- **POST** `/api/ad-partnerships`
+  - **Body**: 
+    ```json
+    {
+      "company_name": string,
+      "contact_person": string,
+      "contact_email": string,
+      "contact_phone": string,
+      "partnership_type": string,
+      "budget_range": string,
+      "campaign_period": string,
+      "target_audience": string,
+      "campaign_description": string,
+      "additional_requirements": string,
+      "attachment_url": string
+    }
+    ```
+  - **Response**: `{ success: true, data: AdPartnership, message: string }`
+
+- **GET** `/api/ad-partnerships/{id}`
+  - **설명**: 광고제휴 상세 조회
+  - **Response**: `{ success: true, data: AdPartnership }`
+
+- **PUT** `/api/ad-partnerships/{id}`
+  - **Body**: 광고제휴 수정 정보 (POST와 동일한 구조, 선택적)
+  - **Response**: `{ success: true, data: AdPartnership, message: string }`
+
+- **DELETE** `/api/ad-partnerships/{id}`
+  - **설명**: 광고제휴 문의 삭제
+  - **Response**: `{ success: true, message: string }`
+
+- **GET** `/api/ad-partnerships/stats/status`
+  - **설명**: 상태별 통계 조회
+  - **Response**: 
+    ```json
+    {
+      "success": true,
+      "data": {
+        "pending": number,
+        "reviewing": number,
+        "approved": number,
+        "rejected": number,
+        "completed": number
+      }
+    }
+    ```
+
 ## 🏥 헬스체크 API
 - **GET** `/health`
   - **설명**: 서버 상태 및 데이터베이스 연결 확인
@@ -319,5 +386,28 @@ interface Category {
   created_at: string;
   updated_at: string;
   children?: Category[];
+}
+```
+
+### AdPartnership 객체
+```typescript
+interface AdPartnership {
+  id: number;
+  company_name: string;
+  contact_person: string;
+  contact_email: string;
+  contact_phone?: string;
+  partnership_type: string;
+  budget_range?: string;
+  campaign_period?: string;
+  target_audience?: string;
+  campaign_description?: string;
+  additional_requirements?: string;
+  attachment_url?: string;
+  inquiry_status: 'pending' | 'reviewing' | 'approved' | 'rejected' | 'completed';
+  admin_notes?: string;
+  response_date?: string;
+  created_at: string;
+  updated_at: string;
 }
 ```

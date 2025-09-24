@@ -82,4 +82,10 @@ export const testConnection = async (): Promise<boolean> => {
   }
 };
 
+// pool export 추가
+export const pool = getDatabaseConnection();
+
+// dbConfig export 추가
+export const dbConfig = getDbConfig();
+
 export default getDatabaseConnection; 

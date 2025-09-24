@@ -18,6 +18,11 @@ import usersRouter from './routes/users';
 import siteSettingsRouter from './routes/siteSettings';
 import tagsRouter from './routes/tags';
 import aiTypesRouter from './routes/aiTypes';
+import categoryDisplayOrderRouter from './routes/categoryDisplayOrder';
+import setupRouter from './routes/setup';
+import homepageSettingsRouter from './routes/homepageSettings';
+import adPartnershipsRouter from './routes/adPartnerships';
+import setupDbRouter from './routes/setup-db';
 
 const app = express();
 const PORT = parseInt(process.env['PORT'] || '3004');
@@ -105,6 +110,154 @@ const swaggerOptions = {
               }
             }
           }
+        },
+        AIService: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: 'AI 서비스 ID'
+            },
+            ai_name: {
+              type: 'string',
+              description: 'AI 서비스명'
+            },
+            ai_description: {
+              type: 'string',
+              description: 'AI 서비스 설명'
+            },
+            ai_logo: {
+              type: 'string',
+              description: 'AI 서비스 로고 URL'
+            },
+            company_name: {
+              type: 'string',
+              description: '개발사명'
+            },
+            pricing_model: {
+              type: 'string',
+              enum: ['free', 'freemium', 'paid', 'subscription'],
+              description: '가격 모델'
+            },
+            difficulty_level: {
+              type: 'string',
+              enum: ['beginner', 'intermediate', 'advanced'],
+              description: '난이도'
+            },
+            is_step_pick: {
+              type: 'boolean',
+              description: 'STEP PICK 여부'
+            },
+            categories: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/Category'
+              },
+              description: '카테고리 목록'
+            }
+          }
+        },
+        AIVideo: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: '영상 ID'
+            },
+            video_title: {
+              type: 'string',
+              description: '영상 제목'
+            },
+            video_description: {
+              type: 'string',
+              description: '영상 설명'
+            },
+            video_url: {
+              type: 'string',
+              description: '영상 URL'
+            },
+            thumbnail_url: {
+              type: 'string',
+              description: '썸네일 URL'
+            },
+            video_duration: {
+              type: 'string',
+              description: '영상 길이'
+            },
+            view_count: {
+              type: 'integer',
+              description: '조회수'
+            },
+            like_count: {
+              type: 'integer',
+              description: '좋아요 수'
+            },
+            created_at: {
+              type: 'string',
+              format: 'date-time',
+              description: '생성일'
+            },
+            ai_services: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/AIService'
+              },
+              description: '연관 AI 서비스'
+            }
+          }
+        },
+        Category: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: '카테고리 ID'
+            },
+            category_name: {
+              type: 'string',
+              description: '카테고리명'
+            },
+            category_icon: {
+              type: 'string',
+              description: '카테고리 아이콘'
+            },
+            parent_id: {
+              type: 'integer',
+              nullable: true,
+              description: '부모 카테고리 ID'
+            },
+            children: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/Category'
+              },
+              description: '하위 카테고리'
+            }
+          }
+        },
+        Curation: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: '큐레이션 ID'
+            },
+            curation_title: {
+              type: 'string',
+              description: '큐레이션 제목'
+            },
+            curation_description: {
+              type: 'string',
+              description: '큐레이션 설명'
+            },
+            ai_services: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/AIService'
+              },
+              description: '포함된 AI 서비스'
+            }
+          }
         }
       }
     }
@@ -128,6 +281,11 @@ app.use('/api/curations', curationsRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/site-settings', siteSettingsRouter);
 app.use('/api/ai-types', aiTypesRouter);
+app.use('/api/category-display-order', categoryDisplayOrderRouter);
+app.use('/api/setup', setupRouter);
+app.use('/api/homepage-settings', homepageSettingsRouter);
+app.use('/api/ad-partnerships', adPartnershipsRouter);
+app.use('/api/setup-db', setupDbRouter);
 
 // 헬스체크 엔드포인트
 app.get('/health', async (_req, res) => {
@@ -163,7 +321,8 @@ app.get('/', (_req, res) => {
       curations: '/api/curations',
       users: '/api/users',
       siteSettings: '/api/site-settings',
-      tags: '/api/tags'
+      tags: '/api/tags',
+      adPartnerships: '/api/ad-partnerships'
     }
   });
 });
