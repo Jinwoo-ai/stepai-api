@@ -34,7 +34,7 @@ router.get('/main', async (req, res) => {
             [curation.id]
           );
 
-          // 각 AI 서비스의 카테고리 조회
+          // 각 AI 서비스의 카테고리 및 태그 조회
           const servicesWithCategories = [];
           for (const service of aiServices) {
             try {
@@ -45,6 +45,19 @@ router.get('/main', async (req, res) => {
                  WHERE asc.ai_service_id = ?`,
                 [service.id]
               );
+              
+              // 태그 정보 추가
+              const [tags] = await connection.execute<RowDataPacket[]>(
+                `SELECT t.id, t.tag_name
+                 FROM tags t
+                 INNER JOIN ai_service_tags ast ON t.id = ast.tag_id
+                 WHERE ast.ai_service_id = ?
+                 ORDER BY t.tag_name`,
+                [service.id]
+              );
+              service['tags'] = tags.map(tag => tag['tag_name']).join(' #');
+              if (service['tags']) service['tags'] = '#' + service['tags'];
+              service['tag_ids'] = tags.map(tag => tag['id']);
               
               servicesWithCategories.push({
                 ...service,
@@ -166,8 +179,23 @@ router.get('/', async (req, res) => {
               );
               
               if (services.length > 0) {
+                const service = services[0];
+                
+                // 태그 정보 추가
+                const [tags] = await connection.execute<RowDataPacket[]>(
+                  `SELECT t.id, t.tag_name
+                   FROM tags t
+                   INNER JOIN ai_service_tags ast ON t.id = ast.tag_id
+                   WHERE ast.ai_service_id = ?
+                   ORDER BY t.tag_name`,
+                  [service.id]
+                );
+                service['tags'] = tags.map(tag => tag['tag_name']).join(' #');
+                if (service['tags']) service['tags'] = '#' + service['tags'];
+                service['tag_ids'] = tags.map(tag => tag['id']);
+                
                 aiServices.push({
-                  ...services[0],
+                  ...service,
                   service_order: serviceLink.service_order
                 });
               }

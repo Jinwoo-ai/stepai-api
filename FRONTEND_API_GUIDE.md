@@ -7,49 +7,88 @@
 
 ## 🏠 메인페이지 API
 
-### 1. 영상 목록 조회
+### 1. 메인페이지 영상 목록 조회
+
+#### 현재 사용 가능 (프로덕션)
 ```http
-GET /api/videos?limit=5
+GET /api/ai-videos?limit=5
 ```
 **설명**: 메인페이지 영상 섹션용 최신 영상 5개 조회
 
-**Response**:
+#### 향후 사용 예정 (어드민 설정 기반)
+```http
+GET /api/homepage-settings/videos
+```
+**설명**: 어드민이 설정한 메인페이지 전용 영상 목록 조회
+
+> **참고**: 현재 프로덕션 서버에서는 `/api/homepage-settings` 엔드포인트가 등록되지 않아 `/api/ai-videos?limit=5`를 사용해야 합니다.
+
+**현재 사용 가능 API Response** (`/api/ai-videos?limit=5`):
 ```json
 {
   "success": true,
   "data": {
     "data": [
       {
-        "id": 1,
-        "video_title": "ChatGPT 완벽 활용법",
-        "video_description": "ChatGPT를 업무에 활용하는 방법",
-        "video_url": "https://youtube.com/watch?v=...",
-        "thumbnail_url": "https://img.youtube.com/vi/.../maxresdefault.jpg",
-        "video_duration": "10:30",
-        "view_count": 1500,
-        "like_count": 120,
-        "created_at": "2024-01-15T10:00:00Z",
-        "ai_services": [
-          {
-            "id": 1,
-            "ai_name": "ChatGPT",
-            "ai_logo": "/uploads/icons/chatgpt.png",
-            "usage_order": 1
-          }
-        ]
+        "id": 5,
+        "video_title": "돈 한 푼 안 쓰고 삶의 질 혁신적으로 높이는 AI 사용법",
+        "video_description": "AI 전문가와 함께하는 업무 효율 활용팁",
+        "video_url": "https://www.youtube.com/watch?v=TOF4hSwSuIg",
+        "thumbnail_url": "https://img.youtube.com/vi/TOF4hSwSuIg/maxresdefault.jpg",
+        "duration": 0,
+        "video_status": "active",
+        "view_count": 0,
+        "like_count": 0,
+        "created_at": "2025-09-24T20:33:48.000Z",
+        "categories": [],
+        "tags": "#음성/보이스 #코드생성"
       }
-    ]
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 5,
+      "total": 5,
+      "totalPages": 1
+    }
   }
 }
 ```
 
-### 2. 큐레이션 목록 조회
+**향후 예정 API Response** (`/api/homepage-settings/videos`):
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "ai_video_id": 5,
+      "display_order": 1,
+      "is_active": true,
+      "video_title": "ChatGPT 완벽 활용법",
+      "video_description": "ChatGPT를 업무에 활용하는 방법",
+      "thumbnail_url": "https://img.youtube.com/vi/.../maxresdefault.jpg",
+      "video_duration": 630,
+      "view_count": 1500
+    }
+  ]
+}
+```
+
+### 2. 메인페이지 큐레이션 목록 조회
+
+#### 현재 사용 가능 (프로덕션)
 ```http
 GET /api/curations?curation_status=active&include_ai_services=true
 ```
-**설명**: 메인페이지 큐레이션 섹션용 활성 큐레이션과 연결된 AI 서비스 조회
+**설명**: 모든 활성 큐레이션과 연결된 AI 서비스 조회
 
-**Response**:
+#### 향후 사용 예정 (어드민 설정 기반)
+```http
+GET /api/homepage-settings/curations
+```
+**설명**: 어드민이 메인페이지용으로 설정한 큐레이션만 조회
+
+**현재 사용 가능 API Response**:
 ```json
 {
   "success": true,
@@ -65,6 +104,8 @@ GET /api/curations?curation_status=active&include_ai_services=true
           "ai_name": "ChatGPT",
           "ai_description": "OpenAI의 대화형 AI 모델",
           "ai_logo": "/uploads/icons/chatgpt.png",
+          "tags": "#AI글쓰기 #대화형에이전트",
+          "tag_ids": [1, 2],
           "categories": [
             {
               "id": 1,
@@ -78,13 +119,39 @@ GET /api/curations?curation_status=active&include_ai_services=true
 }
 ```
 
-### 3. STEP PICK 서비스 조회
+**향후 예정 API Response**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "curation_id": 3,
+      "display_order": 1,
+      "is_active": true,
+      "curation_title": "업무 효율성을 높이는 AI 도구",
+      "curation_description": "일상 업무에 도움이 되는 AI 서비스 모음",
+      "curation_thumbnail": "/uploads/curations/thumbnail1.jpg"
+    }
+  ]
+}
+```
+
+### 3. 메인페이지 STEP PICK 서비스 조회
+
+#### 현재 사용 가능 (프로덕션)
 ```http
 GET /api/ai-services?is_step_pick=true&ai_status=active&limit=12&include_categories=true
 ```
-**설명**: 메인페이지 STEP PICK 섹션용 추천 AI 서비스 조회
+**설명**: is_step_pick=true인 모든 AI 서비스 조회
 
-**Response**:
+#### 향후 사용 예정 (어드민 설정 기반)
+```http
+GET /api/homepage-settings/step-pick
+```
+**설명**: 어드민이 메인페이지 STEP PICK용으로 설정한 AI 서비스만 조회
+
+**현재 사용 가능 API Response**:
 ```json
 {
   "success": true,
@@ -99,6 +166,8 @@ GET /api/ai-services?is_step_pick=true&ai_status=active&limit=12&include_categor
         "pricing_model": "freemium",
         "difficulty_level": "beginner",
         "is_step_pick": true,
+        "tags": "#API통합 #문서번역 #웹사이트현지화 #음성번역",
+        "tag_ids": [11, 48, 32, 49],
         "categories": [
           {
             "id": 1,
@@ -108,6 +177,25 @@ GET /api/ai-services?is_step_pick=true&ai_status=active&limit=12&include_categor
       }
     ]
   }
+}
+```
+
+**향후 예정 API Response**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "ai_service_id": 5,
+      "display_order": 1,
+      "is_active": true,
+      "ai_name": "ChatGPT",
+      "ai_description": "OpenAI의 대화형 AI 모델",
+      "ai_logo": "/uploads/icons/chatgpt.png",
+      "company_name": "OpenAI"
+    }
+  ]
 }
 ```
 
@@ -193,6 +281,8 @@ GET /api/ai-services/{id}?include_categories=true
         "category_name": "AI 어시스턴트"
       }
     ],
+    "tags": "#AI글쓰기 #대화형에이전트",
+    "tag_ids": [1, 2],
     "contents": [
       {
         "content_type": "features",

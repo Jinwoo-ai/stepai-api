@@ -273,7 +273,6 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // API 라우터들 (더 구체적인 라우트를 먼저 등록)
 app.use('/api/tags', tagsRouter);
 app.use('/api/ai-services', aiServicesRouter);
-app.use('/api/videos', aiVideosRouter);
 app.use('/api/ai-videos', aiVideosRouter);
 app.use('/api/categories', categoriesRouter);
 app.use('/api/dashboard', dashboardRouter);
