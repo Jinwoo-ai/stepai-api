@@ -28,7 +28,15 @@ const app = express();
 const PORT = parseInt(process.env['PORT'] || '3004');
 
 // 미들웨어 설정
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3001', 
+    'https://stepai-admin-production.up.railway.app',
+    'https://web-production-e8790.up.railway.app'
+  ],
+  credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 

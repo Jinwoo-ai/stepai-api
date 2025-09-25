@@ -67,7 +67,8 @@ router.post('/upload-icon', imageUpload.single('icon'), async (req, res) => {
     console.log('Upload request received:', {
       hasFile: !!req.file,
       body: req.body,
-      headers: req.headers['content-type']
+      contentType: req.headers['content-type'],
+      allHeaders: req.headers
     });
     
     if (!req.file) {
