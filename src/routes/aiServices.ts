@@ -64,7 +64,14 @@ router.post('/test', (_req, res) => {
 // 아이콘 업로드 엔드포인트 (개선된 로컬 저장)
 router.post('/upload-icon', imageUpload.single('icon'), async (req, res) => {
   try {
+    console.log('Upload request received:', {
+      hasFile: !!req.file,
+      body: req.body,
+      headers: req.headers['content-type']
+    });
+    
     if (!req.file) {
+      console.log('No file received in request');
       return res.status(400).json({
         success: false,
         error: '이미지 파일이 필요합니다.'
@@ -96,9 +103,25 @@ router.post('/upload-icon', imageUpload.single('icon'), async (req, res) => {
       fs.unlinkSync(req.file.path);
     }
     
+    // multer 에러 처리
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        success: false,
+        error: '파일 크기가 너무 큽니다. (5MB 이하)'
+      });
+    }
+    
+    if (error.message.includes('지원하지 않는 파일 형식')) {
+      return res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+    
     res.status(500).json({
       success: false,
-      error: '아이콘 업로드 중 오류가 발생했습니다.'
+      error: '아이콘 업로드 중 오류가 발생했습니다.',
+      details: error.message
     });
   }
 });
