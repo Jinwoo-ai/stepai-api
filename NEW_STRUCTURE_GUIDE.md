@@ -348,7 +348,7 @@ GET /api/search?q=image&category_id=2&pricing_model=free
 - **Express.js**: RESTful API 서버
 - **MySQL 8.0**: 관계형 데이터베이스
 - **Swagger**: API 문서화 (자동 생성)
-- **Railway**: 클라우드 배포
+- **물리 서버**: 직접 배포
 
 ### 프론트엔드 (관리자) ✅
 - **React + TypeScript**: 관리자 대시보드

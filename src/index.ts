@@ -57,7 +57,7 @@ const swaggerOptions = {
     servers: [
       {
         url: process.env['NODE_ENV'] === 'production' 
-          ? 'https://web-production-e8790.up.railway.app' 
+          ? 'http://115.85.182.98:3004' 
           : `http://localhost:${PORT}`,
         description: process.env['NODE_ENV'] === 'production' ? 'Production server' : 'Development server',
       },

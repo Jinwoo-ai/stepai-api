@@ -21,18 +21,36 @@ const upload = multer({
   }
 });
 
-// 이미지 업로드 설정
+// 이미지 업로드 설정 (개선된 버전)
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = 'public/uploads/icons/';
+    // 디렉토리가 없으면 생성
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(7);
+    const ext = path.extname(file.originalname).toLowerCase();
+    const filename = `${timestamp}_${randomString}${ext}`;
+    cb(null, filename);
+  }
+});
+
 const imageUpload = multer({
-  dest: 'public/uploads/icons/',
+  storage: storage,
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB
   },
   fileFilter: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (['.jpg', '.jpeg', '.png', '.gif', '.ico', '.svg'].includes(ext)) {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+    if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('이미지 파일만 업로드 가능합니다.'));
+      cb(new Error('지원하지 않는 파일 형식입니다. JPEG, PNG, GIF, WebP, SVG만 허용됩니다.'));
     }
   }
 });
@@ -43,7 +61,7 @@ router.post('/test', (_req, res) => {
   res.json({ message: 'test post works' });
 });
 
-// 아이콘 업로드 엔드포인트
+// 아이콘 업로드 엔드포인트 (개선된 로컬 저장)
 router.post('/upload-icon', imageUpload.single('icon'), async (req, res) => {
   try {
     if (!req.file) {
@@ -53,28 +71,23 @@ router.post('/upload-icon', imageUpload.single('icon'), async (req, res) => {
       });
     }
 
-    const originalName = req.file.originalname;
-    const ext = path.extname(originalName);
-    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}${ext}`;
-    const newPath = path.join('public/uploads/icons/', fileName);
-    
-    // 파일 이름 변경
-    fs.renameSync(req.file.path, newPath);
-    
-    // URL 반환
+    // multer가 이미 파일명을 생성했으므로 그대로 사용
+    const fileName = req.file.filename;
     const fileUrl = `/uploads/icons/${fileName}`;
     
     res.json({
       success: true,
       data: {
         url: fileUrl,
-        filename: fileName
+        filename: fileName,
+        originalName: req.file.originalname
       },
       message: '아이콘이 업로드되었습니다.'
     });
   } catch (error) {
     console.error('Error uploading icon:', error);
     
+    // 업로드 실패 시 파일 삭제
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
@@ -85,6 +98,8 @@ router.post('/upload-icon', imageUpload.single('icon'), async (req, res) => {
     });
   }
 });
+
+
 
 // AI 서비스 검색
 router.get('/search', async (req, res) => {

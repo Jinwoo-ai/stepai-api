@@ -57,6 +57,8 @@ interface DashboardStats {
   totalViews: number;
 }
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '';
+
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'dashboard' | 'categories' | 'services' | 'videos'>('dashboard');
   const [categories, setCategories] = useState<Category[]>([]);
@@ -96,7 +98,7 @@ const App: React.FC = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('http://localhost:3004/api/categories');
+      const response = await fetch(`${API_BASE_URL}/api/categories`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -110,7 +112,7 @@ const App: React.FC = () => {
 
   const fetchAIServices = async () => {
     try {
-      const response = await fetch('http://localhost:3004/api/ai-services?include_categories=true');
+      const response = await fetch(`${API_BASE_URL}/api/ai-services?include_categories=true`);
       const data = await response.json();
       console.log('AI Services response:', data);
       setAiServices(data.data?.data || data.data || data);
@@ -121,7 +123,7 @@ const App: React.FC = () => {
 
   const fetchDashboardStats = async () => {
     try {
-      const response = await fetch('http://localhost:3004/api/dashboard/stats');
+      const response = await fetch(`${API_BASE_URL}/api/dashboard/stats`);
       const data = await response.json();
       setDashboardStats(data);
     } catch (error) {
@@ -176,8 +178,8 @@ const App: React.FC = () => {
       };
 
       const url = editingService 
-        ? `http://localhost:3004/api/ai-services/${editingService.id}`
-        : 'http://localhost:3004/api/ai-services';
+        ? `${API_BASE_URL}/api/ai-services/${editingService.id}`
+        : `${API_BASE_URL}/api/ai-services`;
       
       const method = editingService ? 'PUT' : 'POST';
       
@@ -207,7 +209,7 @@ const App: React.FC = () => {
     try {
       for (const content of contents) {
         if (content.content_text.trim()) {
-          await fetch(`http://localhost:3004/api/ai-services/${serviceId}/contents`, {
+          await fetch(`${API_BASE_URL}/api/ai-services/${serviceId}/contents`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -252,7 +254,7 @@ const App: React.FC = () => {
     
     // 기존 콘텐츠 불러오기
     try {
-      const response = await fetch(`http://localhost:3004/api/ai-services/${service.id}/contents`);
+      const response = await fetch(`${API_BASE_URL}/api/ai-services/${service.id}/contents`);
       if (response.ok) {
         const existingContents = await response.json();
         const updatedContents = contents.map(content => {
@@ -271,7 +273,7 @@ const App: React.FC = () => {
   const deleteService = async (id: number) => {
     if (window.confirm('정말 삭제하시겠습니까?')) {
       try {
-        await fetch(`http://localhost:3004/api/ai-services/${id}`, { method: 'DELETE' });
+        await fetch(`${API_BASE_URL}/api/ai-services/${id}`, { method: 'DELETE' });
         fetchAIServices();
         fetchDashboardStats();
       } catch (error) {

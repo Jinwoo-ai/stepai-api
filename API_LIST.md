@@ -1,7 +1,7 @@
 # StepAI API 리스트
 
 ## 🏠 기본 정보
-- **Base URL**: `http://localhost:3004` (개발), `https://web-production-e8790.up.railway.app` (프로덕션)
+- **Base URL**: `http://localhost:3004` (개발), `http://115.85.182.98:3004` (프로덕션)
 - **API 문서**: `/api-docs` (Swagger UI)
 - **헬스체크**: `/health`
 

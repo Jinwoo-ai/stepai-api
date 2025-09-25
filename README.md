@@ -160,7 +160,7 @@ stepai_api/
 ├── package.json
 ├── tsconfig.json
 ├── Dockerfile                  # Docker 설정
-├── railway.json               # Railway 배포 설정
+
 └── README.md
 ```
 

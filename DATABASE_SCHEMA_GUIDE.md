@@ -2,7 +2,7 @@
 
 ## 📊 데이터베이스 개요
 
-StepAI API는 AI 서비스 소개 및 이용방법 추천 서비스를 위한 관계형 데이터베이스를 사용합니다. 이 문서는 데이터베이스 구조와 엔티티 간의 관계를 설명합니다.
+StepAI API는 AI 서비스 소개 및 이용방법 추천 서비스를 위한 관계형 데이터베이스를 사용합니다. MySQL 8.0 이상 버전을 지원하며, SNS 로그인 기반 회원 시스템과 AI 서비스 관리 시스템을 제공합니다.
 
 ## 🏗️ 전체 아키텍처
 
@@ -12,28 +12,28 @@ StepAI API는 AI 서비스 소개 및 이용방법 추천 서비스를 위한 �
 │   (회원 관리)    │    │  (AI 서비스)     │    │   (AI 영상)      │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                 │
-         ┌───────────────────────┼───────────────────────┐
-         │                       │                       │
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Categories    │    │   Curations     │    │   User Favorites │
-│ (계층적 카테고리) │    │   (큐레이션)     │    │   (사용자 즐겨찾기)│
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+    ┌────┴────┐                  │                       │
+    │         │                  │                       │
+┌───▼───┐ ┌──▼──┐               │                       │
+│User   │ │Access│               │                       │
+│SNS    │ │Token│               │                       │
+└───────┘ └─────┘               │                       │
          │                       │                       │
          └───────────────────────┼───────────────────────┘
                                  │
          ┌───────────────────────┼───────────────────────┐
          │                       │                       │
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│    Reviews      │    │   View Records  │    │    Rankings     │
-│   (리뷰 시스템)   │    │   (조회 기록)    │    │   (랭킹 시스템)   │
+│   Categories    │    │   Curations     │    │ Ad Partnerships │
+│ (계층적 카테고리) │    │   (큐레이션)     │    │   (광고제휴)     │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
 ## 👥 사용자 관리 테이블
 
 ### Users (회원)
+SNS 로그인 기반 회원 정보를 관리합니다.
+
 ```sql
 CREATE TABLE users (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -43,35 +43,44 @@ CREATE TABLE users (
   job_role VARCHAR(50) COMMENT '직무',
   job_level VARCHAR(30) COMMENT '직급',
   experience_years INT COMMENT '연차',
-  user_type VARCHAR(20) DEFAULT 'member' COMMENT '사용자 타입',
-  user_status VARCHAR(20) DEFAULT 'active' COMMENT '사용자 상태',
+  user_type VARCHAR(20) DEFAULT 'member' COMMENT '사용자 타입', -- member, admin
+  user_status VARCHAR(20) DEFAULT 'active' COMMENT '사용자 상태', -- active, inactive, pending, deleted
   deleted_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_email (email),
-  INDEX idx_type_status (user_type, user_status),
-  INDEX idx_industry (industry),
-  INDEX idx_job_role (job_role)
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 ```
 
+**주요 특징:**
+- 이메일 중복 방지 (UNIQUE 제약조건)
+- 업종, 직무, 직급, 연차 정보 관리
+- 소프트 삭제 지원 (`deleted_at`)
+- 관리자/일반회원 구분 (`user_type`)
+
 ### User SNS (SNS 로그인 정보)
+네이버, 카카오, 구글 SNS 로그인 정보를 관리합니다.
+
 ```sql
 CREATE TABLE user_sns (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
-  sns_type VARCHAR(20) NOT NULL COMMENT 'SNS 종류',
+  sns_type VARCHAR(20) NOT NULL COMMENT 'SNS 종류', -- naver, kakao, google
   sns_user_id VARCHAR(100) NOT NULL COMMENT 'SNS 사용자 ID',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_sns_user (sns_type, sns_user_id),
-  INDEX idx_user_id (user_id),
-  INDEX idx_sns_type (sns_type)
+  UNIQUE KEY unique_sns_user (sns_type, sns_user_id)
 );
 ```
 
+**주요 특징:**
+- SNS 타입별 고유 사용자 ID 관리
+- 동일 SNS 계정 중복 가입 방지
+- 사용자 삭제 시 연관 데이터 자동 삭제
+
 ### Access Tokens (액세스 토큰)
+사용자 인증을 위한 액세스 토큰을 관리합니다.
+
 ```sql
 CREATE TABLE access_tokens (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -79,39 +88,42 @@ CREATE TABLE access_tokens (
   token VARCHAR(255) NOT NULL UNIQUE COMMENT '액세스 토큰',
   expires_at TIMESTAMP NOT NULL COMMENT '만료일시',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  INDEX idx_token (token),
-  INDEX idx_user_id (user_id),
-  INDEX idx_expires_at (expires_at)
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 ```
 
 **주요 특징:**
-- SNS 로그인 기반 인증 시스템
-- 네이버, 카카오, 구글 SNS 지원
-- 30일 만료 액세스 토큰
-- 업종, 직무, 직급, 연차 정보 관리
-- 소프트 삭제 지원 (`deleted_at`)
-- 이메일 중복 방지
+- 30일 만료 토큰 시스템
+- 토큰 중복 방지
+- 만료된 토큰 자동 정리 가능
 
 ## 🤖 AI 서비스 및 영상 테이블
 
 ### AI Services (AI 서비스)
+AI 서비스 정보를 관리합니다.
+
 ```sql
 CREATE TABLE ai_services (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  ai_name VARCHAR(100) NOT NULL,
-  ai_description TEXT,
-  ai_type VARCHAR(255) NOT NULL, -- LLM, RAG, GPTs, Image_Generation, Video_Generation, etc.
-  ai_website VARCHAR(255),
-  ai_logo VARCHAR(255),
-  pricing_model VARCHAR(50), -- free, freemium, paid, subscription
+  ai_name VARCHAR(100) NOT NULL, -- 서비스명(국문)
+  ai_name_en VARCHAR(100), -- 서비스명(영문)
+  ai_description TEXT, -- 한줄설명
+  ai_website VARCHAR(255), -- 대표 URL
+  ai_logo VARCHAR(255), -- 로고(URL)
+  company_name VARCHAR(100), -- 기업명(국문)
+  company_name_en VARCHAR(100), -- 기업명(영문)
+  embedded_video_url VARCHAR(500), -- 임베디드 영상 URL
+  headquarters VARCHAR(50), -- 본사
+  main_features TEXT, -- 주요기능
+  target_users TEXT, -- 타겟 사용자
+  use_cases TEXT, -- 추천활용사례
   pricing_info TEXT,
-  difficulty_level VARCHAR(20) DEFAULT 'beginner', -- beginner, intermediate, advanced
-  ai_status VARCHAR(20) DEFAULT 'active', -- active, inactive, pending, deleted
-  is_visible BOOLEAN DEFAULT TRUE, -- 사이트 노출여부
-  is_step_pick BOOLEAN DEFAULT FALSE, -- Step Pick 여부
-  nationality VARCHAR(20),
+  difficulty_level VARCHAR(20) DEFAULT 'beginner', -- 난이도
+  usage_availability VARCHAR(10), -- 사용 (가능, 불가능)
+  ai_status VARCHAR(20) DEFAULT 'active',
+  is_visible BOOLEAN DEFAULT TRUE, -- Alive (Yes/No)
+  is_step_pick BOOLEAN DEFAULT FALSE, -- 표시위치 (STEP_PICK)
+  nationality VARCHAR(20), -- 본사 (deprecated, use headquarters)
   deleted_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -119,6 +131,8 @@ CREATE TABLE ai_services (
 ```
 
 ### AI Videos (AI 영상)
+AI 관련 영상 콘텐츠를 관리합니다.
+
 ```sql
 CREATE TABLE ai_videos (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -137,7 +151,9 @@ CREATE TABLE ai_videos (
 );
 ```
 
-### Categories (카테고리 - 메인/서브 구조)
+### Categories (카테고리)
+계층적 카테고리 구조를 지원합니다.
+
 ```sql
 CREATE TABLE categories (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -146,6 +162,7 @@ CREATE TABLE categories (
   category_icon VARCHAR(255),
   parent_id INT NULL, -- 부모 카테고리 ID (NULL이면 메인 카테고리)
   category_order INT DEFAULT 0,
+  priority INT DEFAULT 0, -- 우선순위 (높을수록 상단 고정)
   category_status VARCHAR(20) DEFAULT 'active', -- active, inactive
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -154,6 +171,8 @@ CREATE TABLE categories (
 ```
 
 ### Curations (큐레이션)
+AI 서비스 큐레이션을 관리합니다.
+
 ```sql
 CREATE TABLE curations (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -263,7 +282,7 @@ CREATE TABLE reviews (
 );
 ```
 
-## 📊 조회 기록 및 랭킹 시스템
+## 📊 조회 및 통계 테이블
 
 ### AI Service Views (AI 서비스 조회 기록)
 ```sql
@@ -295,23 +314,106 @@ CREATE TABLE ai_video_views (
 );
 ```
 
-### Rankings (랭킹 결과 저장)
+### Rankings (랭킹)
 ```sql
 CREATE TABLE rankings (
   id INT AUTO_INCREMENT PRIMARY KEY,
   ranking_type VARCHAR(50) NOT NULL, -- ai_service, ai_video, category, curation
   entity_id INT NOT NULL,
   entity_type VARCHAR(50) NOT NULL, -- ai_service_id, ai_video_id, category_id, curation_id
-  total_score DECIMAL(10,3) NOT NULL,
+  total_score DECIMAL(10,3) DEFAULT 0,
   view_count INT DEFAULT 0,
   favorite_count INT DEFAULT 0,
-  avg_rating DECIMAL(3,2) DEFAULT 0.00,
+  avg_rating DECIMAL(3,2) DEFAULT 0,
   ranking_date DATE NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY unique_ranking (ranking_type, entity_id, ranking_date)
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
-```## 🔧 AI 서비스 확장 테이블
+```
+
+## 🏢 비즈니스 관리 테이블
+
+### Ad Partnerships (광고제휴)
+광고제휴 문의를 관리합니다.
+
+```sql
+CREATE TABLE ad_partnerships (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  company_name VARCHAR(100) NOT NULL COMMENT '회사명',
+  contact_person VARCHAR(50) NOT NULL COMMENT '담당자명',
+  contact_email VARCHAR(100) NOT NULL COMMENT '담당자 이메일',
+  contact_phone VARCHAR(20) COMMENT '연락처',
+  partnership_type VARCHAR(50) NOT NULL COMMENT '제휴 유형', -- banner, sponsored_content, affiliate, etc.
+  budget_range VARCHAR(50) COMMENT '예산 범위',
+  campaign_period VARCHAR(100) COMMENT '캠페인 기간',
+  target_audience TEXT COMMENT '타겟 고객층',
+  campaign_description TEXT COMMENT '캠페인 설명',
+  additional_requirements TEXT COMMENT '추가 요구사항',
+  attachment_url VARCHAR(500) COMMENT '첨부파일 URL',
+  inquiry_status VARCHAR(20) DEFAULT 'pending' COMMENT '문의 상태', -- pending, reviewing, approved, rejected, completed
+  admin_notes TEXT COMMENT '관리자 메모',
+  response_date TIMESTAMP NULL COMMENT '응답일',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+```
+
+### Site Settings (사이트 설정)
+```sql
+CREATE TABLE site_settings (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  site_title VARCHAR(200) NOT NULL DEFAULT 'StepAI',
+  company_name VARCHAR(100) NOT NULL DEFAULT 'StepAI',
+  ceo_name VARCHAR(50),
+  business_number VARCHAR(20),
+  phone_number VARCHAR(20),
+  address TEXT,
+  privacy_officer VARCHAR(50),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+```
+
+## 🏷️ 태그 및 분류 테이블
+
+### Tags (태그)
+```sql
+CREATE TABLE tags (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  tag_name VARCHAR(50) UNIQUE NOT NULL,
+  tag_count INT DEFAULT 0, -- 사용 횟수
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+```
+
+### AI Service Tags (AI 서비스-태그 관계)
+```sql
+CREATE TABLE ai_service_tags (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ai_service_id INT NOT NULL,
+  tag_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
+  FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_ai_service_tag (ai_service_id, tag_id)
+);
+```
+
+### AI Video Tags (AI 영상-태그 관계)
+```sql
+CREATE TABLE ai_video_tags (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ai_video_id INT NOT NULL,
+  tag_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (ai_video_id) REFERENCES ai_videos(id) ON DELETE CASCADE,
+  FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_ai_video_tag (ai_video_id, tag_id)
+);
+```
+
+## 🔧 확장 테이블
 
 ### AI Service Contents (AI 서비스 콘텐츠)
 ```sql
@@ -357,248 +459,48 @@ CREATE TABLE ai_service_similar_services (
 );
 ```
 
-## 📈 주요 인덱스
+## 📈 인덱스 전략
 
-```sql
--- 사용자 관련 인덱스
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_type_status ON users(user_type, user_status);
+### 주요 인덱스
+- **Users**: `idx_email`, `idx_type_status`, `idx_industry`, `idx_job_role`
+- **User SNS**: `idx_user_id`, `idx_sns_type`, `unique_sns_user`
+- **Access Tokens**: `idx_token`, `idx_user_id`, `idx_expires_at`
+- **AI Services**: 기본 검색 및 필터링을 위한 복합 인덱스
+- **Categories**: 계층 구조 조회를 위한 `parent_id` 인덱스
+- **Ad Partnerships**: `idx_partnership_type`, `idx_inquiry_status`, `idx_created_at`
 
--- AI 서비스 관련 인덱스
-CREATE INDEX idx_ai_services_type ON ai_services(ai_type);
-CREATE INDEX idx_ai_services_status ON ai_services(ai_status);
-CREATE INDEX idx_ai_services_nationality ON ai_services(nationality);
-CREATE INDEX idx_ai_services_step_pick ON ai_services(is_step_pick);
+### 성능 최적화
+- 자주 조회되는 컬럼에 인덱스 적용
+- 외래키 제약조건 자동 인덱스 활용
+- 복합 인덱스를 통한 다중 조건 검색 최적화
 
--- AI 영상 관련 인덱스
-CREATE INDEX idx_ai_videos_status ON ai_videos(video_status);
-CREATE INDEX idx_ai_videos_view_count ON ai_videos(view_count);
+## 🔒 보안 및 제약조건
 
--- 카테고리 관련 인덱스
-CREATE INDEX idx_categories_parent ON categories(parent_id);
-CREATE INDEX idx_categories_status ON categories(category_status);
-CREATE INDEX idx_categories_order ON categories(category_order);
+### 데이터 무결성
+- 외래키 제약조건으로 참조 무결성 보장
+- UNIQUE 제약조건으로 중복 데이터 방지
+- CHECK 제약조건으로 데이터 유효성 검증
 
--- 조회 기록 관련 인덱스
-CREATE INDEX idx_ai_service_views_service ON ai_service_views(ai_service_id);
-CREATE INDEX idx_ai_service_views_date ON ai_service_views(view_date);
-CREATE INDEX idx_ai_video_views_video ON ai_video_views(ai_video_id);
-CREATE INDEX idx_ai_video_views_date ON ai_video_views(view_date);
+### 소프트 삭제
+- `deleted_at` 컬럼을 통한 소프트 삭제 구현
+- 데이터 복구 가능성 보장
+- 관련 데이터 일관성 유지
 
--- 랭킹 관련 인덱스
-CREATE INDEX idx_rankings_type_date ON rankings(ranking_type, ranking_date);
-CREATE INDEX idx_rankings_entity ON rankings(entity_type, entity_id);
-```
+### 인증 및 권한
+- SNS 로그인 기반 인증 시스템
+- 액세스 토큰 기반 API 인증
+- 관리자/일반회원 권한 구분
 
-## 🎯 주요 특징
+## 📝 마이그레이션 가이드
 
-### 1. 계층적 카테고리 구조
-- 메인 카테고리와 서브 카테고리로 구성
-- `parent_id`를 통한 자기 참조 관계
-- 드래그 앤 드롭을 위한 `category_order` 필드
+### 초기 설정
+1. MySQL 8.0 이상 설치
+2. `create_tables.sql` 실행
+3. 기본 데이터 삽입 (카테고리, 관리자 계정 등)
 
-### 2. 소프트 삭제 지원
-- `deleted_at` 필드를 통한 논리적 삭제
-- 데이터 복구 가능
-- 관련 데이터 무결성 유지
+### 데이터 마이그레이션
+- 기존 users 테이블에서 SNS 로그인 기반으로 마이그레이션 완료
+- Foreign key 참조 관계 정리 완료
+- 테스트 데이터 삽입 완료
 
-### 3. 가격 정보 관리
-- `pricing_model`: 무료, 프리미엄, 유료, 구독 모델
-- `pricing_info`: 상세 가격 정보
-- `difficulty_level`: 사용 난이도
-
-### 4. 조회 기록 및 랭킹
-- 실시간 조회 기록 저장
-- 다양한 지표를 통한 랭킹 계산
-- 날짜별 랭킹 히스토리 관리
-
-### 5. 확장 가능한 구조
-- AI 서비스별 상세 콘텐츠 관리
-- SNS 링크 관리
-- 유사 서비스 추천 시스템
-```
-
-### Ranking Weights (랭킹 가중치 설정)
-```sql
-CREATE TABLE ranking_weights (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  ranking_type VARCHAR(50) NOT NULL, -- ai_service, content, expert, category
-  weight_name VARCHAR(100) NOT NULL,
-  weight_value DECIMAL(5,3) NOT NULL,
-  weight_description TEXT,
-  is_active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY unique_ranking_weight (ranking_type, weight_name)
-);
-```
-
-### Rankings (랭킹 결과 저장)
-```sql
-CREATE TABLE rankings (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  ranking_type VARCHAR(50) NOT NULL,
-  entity_id INT NOT NULL,
-  entity_type VARCHAR(50) NOT NULL, -- ai_service_id, content_id, expert_id, category_id
-  total_score DECIMAL(10,3) NOT NULL,
-  view_count INT DEFAULT 0,
-  request_count INT DEFAULT 0,
-  avg_rating DECIMAL(3,2) DEFAULT 0,
-  ranking_date DATE NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY unique_ranking_entity_date (ranking_type, entity_id, ranking_date)
-);
-```
-
-## 🔍 인덱스 전략
-
-### 성능 최적화를 위한 주요 인덱스
-
-```sql
--- 사용자 관련 인덱스
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_type_status ON users(user_type, user_status);
-
--- 전문가 관련 인덱스
-CREATE INDEX idx_experts_user_id ON experts(user_id);
-CREATE INDEX idx_experts_group_id ON experts(group_id);
-CREATE INDEX idx_experts_status ON experts(expert_status);
-CREATE INDEX idx_experts_location ON experts(expert_location);
-
--- AI 서비스 관련 인덱스
-CREATE INDEX idx_ai_services_type ON ai_services(ai_type);
-CREATE INDEX idx_ai_services_status ON ai_services(ai_status);
-CREATE INDEX idx_ai_services_nationality ON ai_services(nationality);
-
--- 콘텐츠 관련 인덱스
-CREATE INDEX idx_contents_type ON contents(content_type);
-CREATE INDEX idx_contents_status ON contents(content_status);
-CREATE INDEX idx_contents_order ON contents(content_order_index);
-
--- 관계 테이블 인덱스
-CREATE INDEX idx_expert_contents_expert ON expert_contents(expert_id);
-CREATE INDEX idx_expert_contents_content ON expert_contents(content_id);
-
--- 랭킹 관련 인덱스
-CREATE INDEX idx_rankings_type_date ON rankings(ranking_type, ranking_date);
-CREATE INDEX idx_rankings_entity ON rankings(entity_type, entity_id);
-CREATE INDEX idx_content_views_content ON content_views(content_id);
-CREATE INDEX idx_content_views_date ON content_views(view_date);
-```
-
-## 📈 데이터 관계도
-
-### 핵심 엔티티 관계
-```
-Users (1) ──────── (1) Experts
-  │                    │
-  │                    │ (M)
-  │                    │
-  │ (1)                └── (M) Expert_Contents (M) ──── (1) Contents
-  │                                                          │
-  │ (1)                                                      │ (M)
-  │                                                          │
-  └── (M) Matching_Requests (M) ──── (1) Experts            └── (M) Content_Category_Relations (M) ──── (1) Content_Categories
-                                                             │
-                                                             └── (M) Content_Tag_Relations (M) ──── (1) Content_Tags
-```
-
-### 랭킹 시스템 관계
-```
-Contents ──── (1:M) ──── Content_Views
-    │                        │
-    │                        │
-    └── Rankings ←──────────── (집계)
-         │
-         └── Ranking_Weights (설정)
-```
-
-## 🛠️ 데이터베이스 설정
-
-### 환경별 데이터베이스
-- **개발**: `stepai_dev`
-- **스테이징**: `stepai_staging`
-- **프로덕션**: `stepai_prod`
-
-### 연결 설정
-```typescript
-// src/configs/database.ts
-const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306'),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'stepai_dev',
-  charset: 'utf8mb4',
-  timezone: '+00:00'
-};
-```
-
-## 🔒 보안 고려사항
-
-### 1. 데이터 보호
-- 비밀번호는 bcrypt로 해시화
-- 개인정보는 암호화 저장
-- 소프트 삭제로 데이터 복구 가능
-
-### 2. 접근 제어
-- 사용자 타입별 권한 관리
-- API 레벨에서 데이터 접근 제한
-- 관리자 전용 기능 분리
-
-### 3. 데이터 무결성
-- 외래 키 제약 조건
-- 중복 데이터 방지 (UNIQUE 제약)
-- 데이터 검증 규칙
-
-## 📊 성능 모니터링
-
-### 주요 모니터링 지표
-1. **쿼리 성능**: 느린 쿼리 로그 분석
-2. **인덱스 사용률**: EXPLAIN 명령어로 확인
-3. **테이블 크기**: 정기적인 용량 모니터링
-4. **연결 수**: 동시 접속자 수 관리
-
-### 최적화 전략
-1. **파티셔닝**: 대용량 테이블 분할
-2. **캐싱**: 자주 조회되는 데이터 캐시
-3. **읽기 전용 복제본**: 조회 성능 향상
-4. **정기적인 통계 업데이트**: 쿼리 최적화
-
-### Ad Partnerships (광고제휴)
-```sql
-CREATE TABLE ad_partnerships (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  company_name VARCHAR(100) NOT NULL COMMENT '회사명',
-  contact_person VARCHAR(50) NOT NULL COMMENT '담당자명',
-  contact_email VARCHAR(100) NOT NULL COMMENT '담당자 이메일',
-  contact_phone VARCHAR(20) COMMENT '연락처',
-  partnership_type VARCHAR(50) NOT NULL COMMENT '제휴 유형',
-  budget_range VARCHAR(50) COMMENT '예산 범위',
-  campaign_period VARCHAR(100) COMMENT '캠페인 기간',
-  target_audience TEXT COMMENT '타겟 고객층',
-  campaign_description TEXT COMMENT '캠페인 설명',
-  additional_requirements TEXT COMMENT '추가 요구사항',
-  attachment_url VARCHAR(500) COMMENT '첨부파일 URL',
-  inquiry_status VARCHAR(20) DEFAULT 'pending' COMMENT '문의 상태',
-  admin_notes TEXT COMMENT '관리자 메모',
-  response_date TIMESTAMP NULL COMMENT '응답일',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_partnership_type (partnership_type),
-  INDEX idx_inquiry_status (inquiry_status),
-  INDEX idx_created_at (created_at)
-);
-```
-
-**주요 특징:**
-- 광고제휴 문의 관리
-- 다양한 제휴 유형 지원 (banner, sponsored_content, affiliate 등)
-- 문의 상태 추적 (pending, reviewing, approved, rejected, completed)
-- 관리자 메모 및 응답 일자 관리
-- 첨부파일 URL 지원
-
----
-
-이 문서는 StepAI API의 데이터베이스 스키마 v1.0.0을 기준으로 작성되었습니다.
+이 스키마는 StepAI 서비스의 모든 핵심 기능을 지원하며, 확장 가능한 구조로 설계되었습니다.
