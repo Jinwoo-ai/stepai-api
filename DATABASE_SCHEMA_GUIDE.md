@@ -162,7 +162,6 @@ CREATE TABLE categories (
   category_icon VARCHAR(255),
   parent_id INT NULL, -- 부모 카테고리 ID (NULL이면 메인 카테고리)
   category_order INT DEFAULT 0,
-  priority INT DEFAULT 0, -- 우선순위 (높을수록 상단 고정)
   category_status VARCHAR(20) DEFAULT 'active', -- active, inactive
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

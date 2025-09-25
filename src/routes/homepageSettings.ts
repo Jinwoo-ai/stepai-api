@@ -1,5 +1,5 @@
 import express from 'express';
-import { pool } from '../configs/database';
+import { getDatabaseConnection } from '../configs/database';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 const router = express.Router();
@@ -13,6 +13,7 @@ const router = express.Router();
  */
 router.get('/videos', async (req, res) => {
   try {
+    const pool = getDatabaseConnection();
     // homepage_videos 테이블에 데이터가 없을 수 있으므로 우선 빈 배열 반환
     const [homepageVideos] = await pool.execute<RowDataPacket[]>(
       'SELECT COUNT(*) as count FROM homepage_videos WHERE is_active = TRUE'
@@ -56,6 +57,7 @@ router.get('/videos', async (req, res) => {
  *     tags: [Homepage Settings]
  */
 router.put('/videos', async (req, res) => {
+  const pool = getDatabaseConnection();
   const connection = await pool.getConnection();
   
   try {
@@ -93,6 +95,7 @@ router.put('/videos', async (req, res) => {
  */
 router.get('/curations', async (req, res) => {
   try {
+    const pool = getDatabaseConnection();
     const query = `
       SELECT 
         hc.id,
@@ -124,6 +127,7 @@ router.get('/curations', async (req, res) => {
  *     tags: [Homepage Settings]
  */
 router.put('/curations', async (req, res) => {
+  const pool = getDatabaseConnection();
   const connection = await pool.getConnection();
   
   try {
@@ -154,28 +158,42 @@ router.put('/curations', async (req, res) => {
  * @swagger
  * /api/homepage-settings/step-pick:
  *   get:
- *     summary: 메인페이지 STEP PICK 설정 조회
+ *     summary: 메인페이지 STEP PICK 설정 조회 (카테고리별)
  *     tags: [Homepage Settings]
  */
 router.get('/step-pick', async (req, res) => {
   try {
-    const query = `
+    const pool = getDatabaseConnection();
+    const categoryId = req.query.category_id as string;
+    
+    let query = `
       SELECT 
         hsp.id,
         hsp.ai_service_id,
+        hsp.category_id,
         hsp.display_order,
         hsp.is_active,
         ais.ai_name,
         ais.ai_description,
         ais.ai_logo,
-        ais.company_name
+        ais.company_name,
+        c.category_name
       FROM homepage_step_pick_services hsp
       JOIN ai_services ais ON hsp.ai_service_id = ais.id
+      LEFT JOIN categories c ON hsp.category_id = c.id
       WHERE hsp.is_active = TRUE
-      ORDER BY hsp.display_order ASC
     `;
+    
+    const params: any[] = [];
+    
+    if (categoryId) {
+      query += ` AND hsp.category_id = ?`;
+      params.push(categoryId);
+    }
+    
+    query += ` ORDER BY hsp.category_id ASC, hsp.display_order ASC`;
 
-    const [rows] = await pool.execute<RowDataPacket[]>(query);
+    const [rows] = await pool.execute<RowDataPacket[]>(query, params);
     res.json({ success: true, data: rows });
   } catch (error) {
     console.error('메인페이지 STEP PICK 조회 실패:', error);
@@ -187,22 +205,28 @@ router.get('/step-pick', async (req, res) => {
  * @swagger
  * /api/homepage-settings/step-pick:
  *   put:
- *     summary: 메인페이지 STEP PICK 설정 업데이트
+ *     summary: 메인페이지 STEP PICK 설정 업데이트 (카테고리별)
  *     tags: [Homepage Settings]
  */
 router.put('/step-pick', async (req, res) => {
+  const pool = getDatabaseConnection();
   const connection = await pool.getConnection();
   
   try {
-    const { services } = req.body;
+    const { services, category_id } = req.body;
     await connection.beginTransaction();
 
-    await connection.execute('DELETE FROM homepage_step_pick_services');
+    // 특정 카테고리의 기존 설정만 삭제
+    if (category_id) {
+      await connection.execute('DELETE FROM homepage_step_pick_services WHERE category_id = ?', [category_id]);
+    } else {
+      await connection.execute('DELETE FROM homepage_step_pick_services WHERE category_id IS NULL');
+    }
 
     for (const service of services) {
       await connection.execute(
-        'INSERT INTO homepage_step_pick_services (ai_service_id, display_order, is_active) VALUES (?, ?, ?)',
-        [service.ai_service_id, service.display_order, service.is_active]
+        'INSERT INTO homepage_step_pick_services (ai_service_id, category_id, display_order, is_active) VALUES (?, ?, ?, ?)',
+        [service.ai_service_id, category_id || null, service.display_order, service.is_active]
       );
     }
 
@@ -226,12 +250,14 @@ router.put('/step-pick', async (req, res) => {
  */
 router.get('/trends', async (req, res) => {
   try {
+    const pool = getDatabaseConnection();
     const query = `
       SELECT 
         id,
         section_type,
         section_title,
         section_description,
+        is_category_based,
         is_active,
         display_order
       FROM trend_sections
@@ -248,18 +274,110 @@ router.get('/trends', async (req, res) => {
 
 /**
  * @swagger
+ * /api/homepage-settings/trends:
+ *   put:
+ *     summary: 트렌드 섹션 설정 업데이트
+ *     tags: [Homepage Settings]
+ */
+router.put('/trends', async (req, res) => {
+  const pool = getDatabaseConnection();
+  const connection = await pool.getConnection();
+  
+  try {
+    const { sections } = req.body;
+    await connection.beginTransaction();
+
+    for (const section of sections) {
+      if (section.id) {
+        // 기존 섹션 업데이트
+        await connection.execute(
+          'UPDATE trend_sections SET section_title = ?, section_description = ?, is_category_based = ?, is_active = ?, display_order = ? WHERE id = ?',
+          [
+            section.section_title, 
+            section.section_description, 
+            section.is_category_based !== undefined ? section.is_category_based : true, 
+            section.is_active, 
+            section.display_order, 
+            section.id
+          ]
+        );
+      } else {
+        // 새 섹션 생성
+        await connection.execute(
+          'INSERT INTO trend_sections (section_type, section_title, section_description, is_category_based, is_active, display_order) VALUES (?, ?, ?, ?, ?, ?)',
+          [
+            section.section_type, 
+            section.section_title, 
+            section.section_description, 
+            section.is_category_based !== undefined ? section.is_category_based : true, 
+            section.is_active, 
+            section.display_order
+          ]
+        );
+      }
+    }
+
+    await connection.commit();
+    res.json({ success: true, message: '트렌드 섹션 설정이 업데이트되었습니다.' });
+  } catch (error) {
+    await connection.rollback();
+    console.error('트렌드 섹션 설정 실패:', error);
+    res.status(500).json({ success: false, error: '트렌드 섹션 설정에 실패했습니다.' });
+  } finally {
+    connection.release();
+  }
+});
+
+/**
+ * @swagger
+ * /api/homepage-settings/trends/{sectionId}:
+ *   delete:
+ *     summary: 트렌드 섹션 삭제
+ *     tags: [Homepage Settings]
+ */
+router.delete('/trends/:sectionId', async (req, res) => {
+  const pool = getDatabaseConnection();
+  const connection = await pool.getConnection();
+  
+  try {
+    const sectionId = parseInt(req.params.sectionId);
+    await connection.beginTransaction();
+
+    // 관련 서비스들 먼저 삭제
+    await connection.execute('DELETE FROM trend_section_services WHERE trend_section_id = ?', [sectionId]);
+    
+    // 섹션 삭제
+    await connection.execute('DELETE FROM trend_sections WHERE id = ?', [sectionId]);
+
+    await connection.commit();
+    res.json({ success: true, message: '트렌드 섹션이 삭제되었습니다.' });
+  } catch (error) {
+    await connection.rollback();
+    console.error('트렌드 섹션 삭제 실패:', error);
+    res.status(500).json({ success: false, error: '트렌드 섹션 삭제에 실패했습니다.' });
+  } finally {
+    connection.release();
+  }
+});
+
+/**
+ * @swagger
  * /api/homepage-settings/trends/{sectionId}/services:
  *   get:
- *     summary: 트렌드 섹션별 서비스 조회
+ *     summary: 트렌드 섹션별 서비스 조회 (카테고리별 지원)
  *     tags: [Homepage Settings]
  */
 router.get('/trends/:sectionId/services', async (req, res) => {
   try {
+    const pool = getDatabaseConnection();
     const sectionId = parseInt(req.params.sectionId);
-    const query = `
+    const categoryId = req.query.category_id as string;
+    
+    let query = `
       SELECT 
         tss.id,
         tss.ai_service_id,
+        tss.category_id,
         tss.display_order,
         tss.is_featured,
         tss.is_active,
@@ -267,14 +385,24 @@ router.get('/trends/:sectionId/services', async (req, res) => {
         ais.ai_description,
         ais.ai_logo,
         ais.company_name,
-        ais.is_step_pick
+        ais.is_step_pick,
+        c.category_name
       FROM trend_section_services tss
       JOIN ai_services ais ON tss.ai_service_id = ais.id
+      LEFT JOIN categories c ON tss.category_id = c.id
       WHERE tss.trend_section_id = ? AND tss.is_active = TRUE
-      ORDER BY tss.is_featured DESC, tss.display_order ASC
     `;
+    
+    const params: any[] = [sectionId];
+    
+    if (categoryId) {
+      query += ` AND tss.category_id = ?`;
+      params.push(categoryId);
+    }
+    
+    query += ` ORDER BY tss.category_id ASC, tss.is_featured DESC, tss.display_order ASC`;
 
-    const [rows] = await pool.execute<RowDataPacket[]>(query, [sectionId]);
+    const [rows] = await pool.execute<RowDataPacket[]>(query, params);
     res.json({ success: true, data: rows });
   } catch (error) {
     console.error('트렌드 섹션 서비스 조회 실패:', error);
@@ -286,24 +414,30 @@ router.get('/trends/:sectionId/services', async (req, res) => {
  * @swagger
  * /api/homepage-settings/trends/{sectionId}/services:
  *   put:
- *     summary: 트렌드 섹션별 서비스 설정 업데이트
+ *     summary: 트렌드 섹션별 서비스 설정 업데이트 (카테고리별 지원)
  *     tags: [Homepage Settings]
  */
 router.put('/trends/:sectionId/services', async (req, res) => {
+  const pool = getDatabaseConnection();
   const connection = await pool.getConnection();
   
   try {
     const sectionId = parseInt(req.params.sectionId);
-    const { services } = req.body;
+    const { services, category_id } = req.body;
     
     await connection.beginTransaction();
 
-    await connection.execute('DELETE FROM trend_section_services WHERE trend_section_id = ?', [sectionId]);
+    // 특정 카테고리의 기존 설정만 삭제
+    if (category_id) {
+      await connection.execute('DELETE FROM trend_section_services WHERE trend_section_id = ? AND category_id = ?', [sectionId, category_id]);
+    } else {
+      await connection.execute('DELETE FROM trend_section_services WHERE trend_section_id = ? AND category_id IS NULL', [sectionId]);
+    }
 
     for (const service of services) {
       await connection.execute(
-        'INSERT INTO trend_section_services (trend_section_id, ai_service_id, display_order, is_featured, is_active) VALUES (?, ?, ?, ?, ?)',
-        [sectionId, service.ai_service_id, service.display_order, service.is_featured, service.is_active]
+        'INSERT INTO trend_section_services (trend_section_id, ai_service_id, category_id, display_order, is_featured, is_active) VALUES (?, ?, ?, ?, ?, ?)',
+        [sectionId, service.ai_service_id, category_id || null, service.display_order, service.is_featured, service.is_active]
       );
     }
 
@@ -327,6 +461,7 @@ router.put('/trends/:sectionId/services', async (req, res) => {
  */
 router.get('/available-videos', async (req, res) => {
   try {
+    const pool = getDatabaseConnection();
     const search = req.query.search as string || '';
     const limit = parseInt(req.query.limit as string) || 50;
 
@@ -369,6 +504,7 @@ router.get('/available-videos', async (req, res) => {
  */
 router.get('/available-curations', async (req, res) => {
   try {
+    const pool = getDatabaseConnection();
     const search = req.query.search as string || '';
     const limit = parseInt(req.query.limit as string) || 50;
 
@@ -410,8 +546,11 @@ router.get('/available-curations', async (req, res) => {
  */
 router.get('/available-services', async (req, res) => {
   try {
+    const pool = getDatabaseConnection();
     const search = req.query.search as string || '';
     const sectionId = req.query.section_id as string;
+    const categoryId = req.query.category_id as string;
+    const isStepPick = req.query.is_step_pick as string;
     const limit = parseInt(req.query.limit as string) || 50;
 
     let query = `
@@ -428,9 +567,23 @@ router.get('/available-services', async (req, res) => {
 
     const params: any[] = [];
 
-    if (sectionId) {
+    if (sectionId && categoryId) {
+      query += ` AND ais.id NOT IN (SELECT ai_service_id FROM trend_section_services WHERE trend_section_id = ? AND category_id = ? AND is_active = TRUE)`;
+      params.push(sectionId, categoryId);
+    } else if (sectionId) {
       query += ` AND ais.id NOT IN (SELECT ai_service_id FROM trend_section_services WHERE trend_section_id = ? AND is_active = TRUE)`;
       params.push(sectionId);
+    }
+
+    // 카테고리별 필터링
+    if (categoryId) {
+      query += ` AND ais.id IN (SELECT ai_service_id FROM ai_service_categories WHERE category_id = ? AND is_main_category = TRUE)`;
+      params.push(categoryId);
+    }
+
+    // STEP PICK 필터 추가
+    if (isStepPick === 'true') {
+      query += ` AND ais.is_step_pick = TRUE`;
     }
 
     if (search) {
@@ -446,6 +599,58 @@ router.get('/available-services', async (req, res) => {
   } catch (error) {
     console.error('사용 가능한 서비스 조회 실패:', error);
     res.status(500).json({ success: false, error: '사용 가능한 서비스 조회에 실패했습니다.' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/homepage-settings:
+ *   get:
+ *     summary: 메인페이지 전체 설정 조회 (카테고리별)
+ *     tags: [Homepage Settings]
+ */
+router.get('/', async (req, res) => {
+  try {
+    const pool = getDatabaseConnection();
+    
+    // 기본 빈 데이터 반환
+    res.json({
+      success: true,
+      data: {
+        videos: [],
+        curations: [],
+        stepPick: [],
+        trends: []
+      }
+    });
+  } catch (error) {
+    console.error('메인페이지 설정 조회 실패:', error);
+    res.status(500).json({ success: false, error: '메인페이지 설정 조회에 실패했습니다.' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/homepage-settings/main-categories:
+ *   get:
+ *     summary: 메인 카테고리 목록 조회
+ *     tags: [Homepage Settings]
+ */
+router.get('/main-categories', async (req, res) => {
+  try {
+    const pool = getDatabaseConnection();
+    const query = `
+      SELECT id, category_name, category_icon
+      FROM categories
+      WHERE parent_id IS NULL AND category_status = 'active'
+      ORDER BY category_order ASC
+    `;
+
+    const [rows] = await pool.execute<RowDataPacket[]>(query);
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('메인 카테고리 조회 실패:', error);
+    res.status(500).json({ success: false, error: '메인 카테고리 조회에 실패했습니다.' });
   }
 });
 

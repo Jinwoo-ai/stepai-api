@@ -7,54 +7,97 @@
 
 ## 🏠 메인페이지 API
 
-### 1. 메인페이지 영상 목록 조회
+### 1. 메인페이지 전체 설정 조회 (통합 API)
 
-#### 현재 사용 가능 (프로덕션)
 ```http
-GET /api/ai-videos?limit=5
+GET /api/homepage-settings
 ```
-**설명**: 메인페이지 영상 섹션용 최신 영상 5개 조회
+**설명**: 메인페이지의 모든 섹션 설정을 한 번에 조회
 
-#### 향후 사용 예정 (어드민 설정 기반)
+**Query Parameters**:
+- `category_id` (선택사항): 특정 카테고리의 STEP PICK 및 트렌드 서비스만 조회
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "videos": [
+      {
+        "id": 1,
+        "ai_video_id": 5,
+        "display_order": 1,
+        "is_active": true,
+        "video_title": "ChatGPT 완벽 활용법",
+        "video_description": "ChatGPT를 업무에 활용하는 방법",
+        "thumbnail_url": "https://img.youtube.com/vi/.../maxresdefault.jpg",
+        "video_duration": 630,
+        "view_count": 1500
+      }
+    ],
+    "curations": [
+      {
+        "id": 1,
+        "curation_id": 3,
+        "display_order": 1,
+        "is_active": true,
+        "curation_title": "업무 효율성을 높이는 AI 도구",
+        "curation_description": "일상 업무에 도움이 되는 AI 서비스 모음",
+        "curation_thumbnail": "/uploads/curations/thumbnail1.jpg"
+      }
+    ],
+    "stepPick": [
+      {
+        "id": 1,
+        "ai_service_id": 5,
+        "category_id": 1,
+        "display_order": 1,
+        "is_active": true,
+        "ai_name": "ChatGPT",
+        "ai_description": "OpenAI의 대화형 AI 모델",
+        "ai_logo": "/uploads/icons/chatgpt.png",
+        "company_name": "OpenAI",
+        "category_name": "문서·글쓰기"
+      }
+    ],
+    "trends": [
+      {
+        "id": 1,
+        "section_type": "popular",
+        "section_title": "요즘 많이 쓰는",
+        "section_description": "사용자들이 많이 이용하는 인기 AI 서비스",
+        "is_category_based": true,
+        "is_active": true,
+        "display_order": 1,
+        "services": [
+          {
+            "id": 1,
+            "ai_service_id": 3,
+            "category_id": 1,
+            "display_order": 1,
+            "is_featured": true,
+            "is_active": true,
+            "ai_name": "Claude",
+            "ai_description": "Anthropic의 AI 어시스턴트",
+            "ai_logo": "/uploads/icons/claude.png",
+            "company_name": "Anthropic",
+            "category_name": "문서·글쓰기"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### 2. 메인페이지 영상 섹션 조회
+
 ```http
 GET /api/homepage-settings/videos
 ```
 **설명**: 어드민이 설정한 메인페이지 전용 영상 목록 조회
 
-> **참고**: 현재 프로덕션 서버에서는 `/api/homepage-settings` 엔드포인트가 등록되지 않아 `/api/ai-videos?limit=5`를 사용해야 합니다.
-
-**현재 사용 가능 API Response** (`/api/ai-videos?limit=5`):
-```json
-{
-  "success": true,
-  "data": {
-    "data": [
-      {
-        "id": 5,
-        "video_title": "돈 한 푼 안 쓰고 삶의 질 혁신적으로 높이는 AI 사용법",
-        "video_description": "AI 전문가와 함께하는 업무 효율 활용팁",
-        "video_url": "https://www.youtube.com/watch?v=TOF4hSwSuIg",
-        "thumbnail_url": "https://img.youtube.com/vi/TOF4hSwSuIg/maxresdefault.jpg",
-        "duration": 0,
-        "video_status": "active",
-        "view_count": 0,
-        "like_count": 0,
-        "created_at": "2025-09-24T20:33:48.000Z",
-        "categories": [],
-        "tags": "#음성/보이스 #코드생성"
-      }
-    ],
-    "pagination": {
-      "page": 1,
-      "limit": 5,
-      "total": 5,
-      "totalPages": 1
-    }
-  }
-}
-```
-
-**향후 예정 API Response** (`/api/homepage-settings/videos`):
+**Response**:
 ```json
 {
   "success": true,
@@ -74,52 +117,14 @@ GET /api/homepage-settings/videos
 }
 ```
 
-### 2. 메인페이지 큐레이션 목록 조회
+### 3. 메인페이지 큐레이션 섹션 조회
 
-#### 현재 사용 가능 (프로덕션)
-```http
-GET /api/curations?curation_status=active&include_ai_services=true
-```
-**설명**: 모든 활성 큐레이션과 연결된 AI 서비스 조회
-
-#### 향후 사용 예정 (어드민 설정 기반)
 ```http
 GET /api/homepage-settings/curations
 ```
 **설명**: 어드민이 메인페이지용으로 설정한 큐레이션만 조회
 
-**현재 사용 가능 API Response**:
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "curation_title": "업무 효율성을 높이는 AI 도구",
-      "curation_description": "일상 업무에 도움이 되는 AI 서비스 모음",
-      "curation_status": "active",
-      "ai_services": [
-        {
-          "id": 1,
-          "ai_name": "ChatGPT",
-          "ai_description": "OpenAI의 대화형 AI 모델",
-          "ai_logo": "/uploads/icons/chatgpt.png",
-          "tags": "#AI글쓰기 #대화형에이전트",
-          "tag_ids": [1, 2],
-          "categories": [
-            {
-              "id": 1,
-              "category_name": "AI 어시스턴트"
-            }
-          ]
-        }
-      ]
-    }
-  ]
-}
-```
-
-**향후 예정 API Response**:
+**Response**:
 ```json
 {
   "success": true,
@@ -137,50 +142,17 @@ GET /api/homepage-settings/curations
 }
 ```
 
-### 3. 메인페이지 STEP PICK 서비스 조회
+### 4. 메인페이지 STEP PICK 섹션 조회 (카테고리별)
 
-#### 현재 사용 가능 (프로덕션)
-```http
-GET /api/ai-services?is_step_pick=true&ai_status=active&limit=12&include_categories=true
-```
-**설명**: is_step_pick=true인 모든 AI 서비스 조회
-
-#### 향후 사용 예정 (어드민 설정 기반)
 ```http
 GET /api/homepage-settings/step-pick
 ```
-**설명**: 어드민이 메인페이지 STEP PICK용으로 설정한 AI 서비스만 조회
+**설명**: 어드민이 메인페이지 STEP PICK용으로 설정한 AI 서비스 조회 (카테고리별 지원)
 
-**현재 사용 가능 API Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "data": [
-      {
-        "id": 1,
-        "ai_name": "ChatGPT",
-        "ai_description": "OpenAI의 대화형 AI 모델",
-        "ai_logo": "/uploads/icons/chatgpt.png",
-        "company_name": "OpenAI",
-        "pricing_model": "freemium",
-        "difficulty_level": "beginner",
-        "is_step_pick": true,
-        "tags": "#API통합 #문서번역 #웹사이트현지화 #음성번역",
-        "tag_ids": [11, 48, 32, 49],
-        "categories": [
-          {
-            "id": 1,
-            "category_name": "AI 어시스턴트"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
+**Query Parameters**:
+- `category_id` (선택사항): 특정 카테고리의 STEP PICK 서비스만 조회
 
-**향후 예정 API Response**:
+**Response**:
 ```json
 {
   "success": true,
@@ -188,12 +160,116 @@ GET /api/homepage-settings/step-pick
     {
       "id": 1,
       "ai_service_id": 5,
+      "category_id": 1,
       "display_order": 1,
       "is_active": true,
       "ai_name": "ChatGPT",
       "ai_description": "OpenAI의 대화형 AI 모델",
       "ai_logo": "/uploads/icons/chatgpt.png",
-      "company_name": "OpenAI"
+      "company_name": "OpenAI",
+      "category_name": "문서·글쓰기"
+    }
+  ]
+}
+```
+
+### 5. 트렌드 섹션 목록 조회
+
+```http
+GET /api/homepage-settings/trends
+```
+**설명**: 트렌드 섹션 설정 목록 조회
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "section_type": "popular",
+      "section_title": "요즘 많이 쓰는",
+      "section_description": "사용자들이 많이 이용하는 인기 AI 서비스",
+      "is_category_based": true,
+      "is_active": true,
+      "display_order": 1
+    },
+    {
+      "id": 2,
+      "section_type": "latest",
+      "section_title": "최신 등록",
+      "section_description": "최근에 등록된 새로운 AI 서비스",
+      "is_category_based": true,
+      "is_active": true,
+      "display_order": 2
+    },
+    {
+      "id": 3,
+      "section_type": "step_pick",
+      "section_title": "STEP PICK",
+      "section_description": "STEP AI가 추천하는 엄선된 AI 서비스",
+      "is_category_based": true,
+      "is_active": true,
+      "display_order": 3
+    }
+  ]
+}
+```
+
+### 6. 트렌드 섹션별 서비스 조회 (카테고리별)
+
+```http
+GET /api/homepage-settings/trends/{sectionId}/services
+```
+**설명**: 특정 트렌드 섹션의 AI 서비스 목록 조회 (카테고리별 지원)
+
+**Query Parameters**:
+- `category_id` (선택사항): 특정 카테고리의 서비스만 조회
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "ai_service_id": 3,
+      "category_id": 1,
+      "display_order": 1,
+      "is_featured": true,
+      "is_active": true,
+      "ai_name": "Claude",
+      "ai_description": "Anthropic의 AI 어시스턴트",
+      "ai_logo": "/uploads/icons/claude.png",
+      "company_name": "Anthropic",
+      "is_step_pick": false,
+      "category_name": "문서·글쓰기"
+    }
+  ]
+}
+```
+
+### 7. 메인 카테고리 목록 조회
+
+```http
+GET /api/homepage-settings/main-categories
+```
+**설명**: 메인페이지에서 사용할 수 있는 메인 카테고리 목록 조회
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "category_name": "문서·글쓰기",
+      "category_icon": "📝"
+    },
+    {
+      "id": 2,
+      "category_name": "이미지·영상",
+      "category_icon": "🎨"
     }
   ]
 }

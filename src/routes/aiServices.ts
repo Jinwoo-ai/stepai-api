@@ -81,11 +81,8 @@ router.post('/upload-icon', imageUpload.single('icon'), async (req, res) => {
 
     // multer가 이미 파일명을 생성했으므로 그대로 사용
     const fileName = req.file.filename;
-    // 프로덕션에서는 실제 API 서버 URL, 개발에서는 상대 경로
-    const apiBaseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 3004}`;
-    const fileUrl = process.env.NODE_ENV === 'production' 
-      ? `${apiBaseUrl}/uploads/icons/${fileName}`
-      : `/uploads/icons/${fileName}`;
+    // 상대 경로로 반환 (프론트에서 도메인 추가)
+    const fileUrl = `/uploads/icons/${fileName}`;
     
     res.json({
       success: true,
@@ -345,11 +342,24 @@ router.get('/', async (req, res) => {
       const total = countResult[0]?.['total'] || 0;
       const totalPages = Math.ceil(total / limit);
 
-      // AI 서비스 목록 조회
+      // AI 서비스 목록 조회 (카테고리 표시순서 우선 적용)
+      let orderByClause = 'ai_services.created_at DESC';
+      if (category_id) {
+        orderByClause = `
+          CASE WHEN cdo.display_order IS NOT NULL THEN 0 ELSE 1 END,
+          cdo.display_order ASC,
+          ai_services.created_at DESC
+        `;
+      }
+      
       const [services] = await connection.execute<RowDataPacket[]>(
-        `SELECT DISTINCT ai_services.* FROM ai_services WHERE ${whereClause} 
-         ORDER BY ai_services.created_at DESC LIMIT ? OFFSET ?`,
-        [...queryParams, limit, offset]
+        `SELECT DISTINCT ai_services.* 
+         FROM ai_services 
+         ${category_id ? 'LEFT JOIN category_display_order cdo ON ai_services.id = cdo.ai_service_id AND cdo.category_id = ?' : ''}
+         WHERE ${whereClause} 
+         ORDER BY ${orderByClause}
+         LIMIT ? OFFSET ?`,
+        category_id ? [category_id, ...queryParams, limit, offset] : [...queryParams, limit, offset]
       );
 
       // 카테고리 정보 포함
