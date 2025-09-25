@@ -73,7 +73,11 @@ router.post('/upload-icon', imageUpload.single('icon'), async (req, res) => {
 
     // multer가 이미 파일명을 생성했으므로 그대로 사용
     const fileName = req.file.filename;
-    const fileUrl = `/uploads/icons/${fileName}`;
+    // 프로덕션에서는 실제 API 서버 URL, 개발에서는 상대 경로
+    const apiBaseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 3004}`;
+    const fileUrl = process.env.NODE_ENV === 'production' 
+      ? `${apiBaseUrl}/uploads/icons/${fileName}`
+      : `/uploads/icons/${fileName}`;
     
     res.json({
       success: true,
