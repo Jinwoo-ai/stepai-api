@@ -1312,6 +1312,77 @@ GET /api/setup/check-tables
 }
 ```
 
+## 🎬 AI 영상 API
+
+### 1. AI 영상 상세 조회
+```http
+GET /api/ai-videos/{id}
+```
+**설명**: AI 영상 상세 정보 조회 (앞/뒤 영상 포함)
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 2,
+    "video_title": "n8n 사용법",
+    "video_description": "<p>n8n 에이전트 활용법</p>",
+    "video_url": "https://youtu.be/VlsgHC5xkPA",
+    "thumbnail_url": "https://img.youtube.com/vi/VlsgHC5xkPA/maxresdefault.jpg",
+    "duration": 630,
+    "video_status": "active",
+    "is_visible": 1,
+    "view_count": 150,
+    "like_count": 12,
+    "created_at": "2024-01-15T10:00:00Z",
+    "updated_at": "2024-01-15T10:00:00Z",
+    "categories": [
+      {
+        "id": 1,
+        "category_name": "업무자동화"
+      }
+    ],
+    "ai_services": [
+      {
+        "id": 5,
+        "ai_name": "n8n",
+        "ai_description": "워크플로우 자동화 도구",
+        "ai_logo": "/uploads/icons/n8n.png",
+        "company_name": "n8n GmbH",
+        "difficulty_level": "중급",
+        "usage_order": 1
+      }
+    ],
+    "related_videos": {
+      "previous": {
+        "id": 1,
+        "video_title": "이전 영상 제목",
+        "thumbnail_url": "https://img.youtube.com/vi/.../maxresdefault.jpg",
+        "duration": 480,
+        "view_count": 200
+      },
+      "next": [
+        {
+          "id": 3,
+          "video_title": "다음 영상 제목 1",
+          "thumbnail_url": "https://img.youtube.com/vi/.../maxresdefault.jpg",
+          "duration": 720,
+          "view_count": 180
+        },
+        {
+          "id": 4,
+          "video_title": "다음 영상 제목 2",
+          "thumbnail_url": "https://img.youtube.com/vi/.../maxresdefault.jpg",
+          "duration": 540,
+          "view_count": 95
+        }
+      ]
+    }
+  }
+}
+```
+
 ## 🔧 유틸리티 API
 
 ### 1. 헬스체크

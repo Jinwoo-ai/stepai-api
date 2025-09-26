@@ -498,12 +498,36 @@ router.get('/:id', async (req, res) => {
         console.error('AI services query error for video detail:', id, serviceError);
       }
 
+      // 앞 영상 1개 조회 (이전 영상)
+      const [prevVideos] = await connection.execute<RowDataPacket[]>(
+        `SELECT id, video_title, thumbnail_url, duration, view_count 
+         FROM ai_videos 
+         WHERE id < ? AND deleted_at IS NULL AND video_status = 'active' AND is_visible = TRUE
+         ORDER BY id DESC 
+         LIMIT 1`,
+        [id]
+      );
+
+      // 뒤 영상 2개 조회 (다음 영상)
+      const [nextVideos] = await connection.execute<RowDataPacket[]>(
+        `SELECT id, video_title, thumbnail_url, duration, view_count 
+         FROM ai_videos 
+         WHERE id > ? AND deleted_at IS NULL AND video_status = 'active' AND is_visible = TRUE
+         ORDER BY id ASC 
+         LIMIT 2`,
+        [id]
+      );
+
       res.json({
         success: true,
         data: {
           ...video,
           categories: categories,
-          ai_services: aiServices
+          ai_services: aiServices,
+          related_videos: {
+            previous: prevVideos.length > 0 ? prevVideos[0] : null,
+            next: nextVideos
+          }
         }
       });
     } finally {
