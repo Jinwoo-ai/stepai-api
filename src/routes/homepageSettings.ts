@@ -606,21 +606,106 @@ router.get('/available-services', async (req, res) => {
  * @swagger
  * /api/homepage-settings:
  *   get:
- *     summary: 메인페이지 전체 설정 조회 (카테고리별)
+ *     summary: 메인페이지 전체 설정 조회 (videos, curations, step-pick 포함)
  *     tags: [Homepage Settings]
  */
 router.get('/', async (req, res) => {
   try {
     const pool = getDatabaseConnection();
+    const categoryId = req.query.category_id as string;
     
-    // 기본 빈 데이터 반환
+    // 1. 영상 데이터 조회
+    const [homepageVideosCount] = await pool.execute<RowDataPacket[]>(
+      'SELECT COUNT(*) as count FROM homepage_videos WHERE is_active = TRUE'
+    );
+    
+    let videos = [];
+    if (homepageVideosCount[0].count > 0) {
+      const [videosResult] = await pool.execute<RowDataPacket[]>(`
+        SELECT 
+          hv.id,
+          hv.ai_video_id,
+          hv.display_order,
+          hv.is_active,
+          v.video_title,
+          v.video_description,
+          v.thumbnail_url,
+          v.duration as video_duration,
+          v.view_count
+        FROM homepage_videos hv
+        JOIN ai_videos v ON hv.ai_video_id = v.id
+        WHERE hv.is_active = TRUE AND v.video_status = 'active'
+        ORDER BY hv.display_order ASC
+      `);
+      videos = videosResult;
+    }
+    
+    // 2. 큐레이션 데이터 조회
+    const [curationsResult] = await pool.execute<RowDataPacket[]>(`
+      SELECT 
+        hc.id,
+        hc.curation_id,
+        hc.display_order,
+        hc.is_active,
+        c.curation_title,
+        c.curation_description,
+        c.curation_thumbnail
+      FROM homepage_curations hc
+      JOIN curations c ON hc.curation_id = c.id
+      WHERE hc.is_active = TRUE
+      ORDER BY hc.display_order ASC
+    `);
+    
+    // 3. STEP PICK 데이터 조회 (카테고리별 필터링 지원)
+    let stepPickQuery = `
+      SELECT 
+        hsp.id,
+        hsp.ai_service_id,
+        hsp.category_id,
+        hsp.display_order,
+        hsp.is_active,
+        ais.ai_name,
+        ais.ai_description,
+        ais.ai_logo,
+        ais.company_name,
+        c.category_name
+      FROM homepage_step_pick_services hsp
+      JOIN ai_services ais ON hsp.ai_service_id = ais.id
+      LEFT JOIN categories c ON hsp.category_id = c.id
+      WHERE hsp.is_active = TRUE
+    `;
+    
+    const stepPickParams: any[] = [];
+    if (categoryId) {
+      stepPickQuery += ` AND hsp.category_id = ?`;
+      stepPickParams.push(categoryId);
+    }
+    
+    stepPickQuery += ` ORDER BY hsp.category_id ASC, hsp.display_order ASC`;
+    
+    const [stepPickResult] = await pool.execute<RowDataPacket[]>(stepPickQuery, stepPickParams);
+    
+    // 4. 트렌드 섹션 데이터 조회
+    const [trendsResult] = await pool.execute<RowDataPacket[]>(`
+      SELECT 
+        id,
+        section_type,
+        section_title,
+        section_description,
+        is_category_based,
+        is_active,
+        display_order
+      FROM trend_sections
+      ORDER BY display_order ASC
+    `);
+    
     res.json({
       success: true,
       data: {
-        videos: [],
-        curations: [],
-        stepPick: [],
-        trends: []
+        videos: videos,
+        curations: curationsResult,
+        stepPick: stepPickResult,
+        trends: trendsResult
       }
     });
   } catch (error) {

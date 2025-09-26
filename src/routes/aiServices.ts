@@ -61,6 +61,59 @@ router.post('/test', (_req, res) => {
   res.json({ message: 'test post works' });
 });
 
+// 데이터베이스 연결 테스트 라우트
+router.get('/test-db', async (_req, res) => {
+  try {
+    const pool = getDatabaseConnection();
+    const connection = await pool.getConnection();
+    
+    try {
+      // 간단한 쿼리 테스트
+      const [result] = await connection.execute<RowDataPacket[]>('SELECT 1 as test');
+      
+      // 카테고리 22 존재 여부 확인
+      const [categoryResult] = await connection.execute<RowDataPacket[]>(
+        'SELECT id, category_name FROM categories WHERE id = ?',
+        [22]
+      );
+      
+      // AI 서비스 개수 확인
+      const [serviceCount] = await connection.execute<RowDataPacket[]>(
+        'SELECT COUNT(*) as count FROM ai_services WHERE deleted_at IS NULL'
+      );
+      
+      // ai_service_category_display_order 테이블 존재 여부 확인
+      let categoryDisplayOrderExists = false;
+      try {
+        await connection.execute('SELECT 1 FROM ai_service_category_display_order LIMIT 1');
+        categoryDisplayOrderExists = true;
+      } catch (error) {
+        categoryDisplayOrderExists = false;
+      }
+      
+      res.json({
+        success: true,
+        data: {
+          dbConnection: 'OK',
+          testQuery: result[0],
+          category22: categoryResult.length > 0 ? categoryResult[0] : 'Not found',
+          totalServices: serviceCount[0].count,
+          categoryDisplayOrderTable: categoryDisplayOrderExists ? 'EXISTS' : 'NOT EXISTS'
+        }
+      });
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Database test error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Database connection failed',
+      details: error.message
+    });
+  }
+});
+
 // 아이콘 업로드 엔드포인트 (개선된 로컬 저장)
 router.post('/upload-icon', imageUpload.single('icon'), async (req, res) => {
   try {
@@ -294,14 +347,15 @@ router.get('/:id', async (req, res) => {
 
 // AI 서비스 목록 조회
 router.get('/', async (req, res) => {
+  const page = parseInt(req.query['page'] as string) || 1;
+  const limit = parseInt(req.query['limit'] as string) || 10;
+  const search = req.query['search'] as string;
+  const category_id = req.query['category_id'] ? parseInt(req.query['category_id'] as string) : undefined;
+  const ai_status = req.query['ai_status'] as string;
+  const is_step_pick = req.query['is_step_pick'] as string;
+  const include_categories = req.query['include_categories'] === 'true';
+  
   try {
-    const page = parseInt(req.query['page'] as string) || 1;
-    const limit = parseInt(req.query['limit'] as string) || 10;
-    const search = req.query['search'] as string;
-    const category_id = req.query['category_id'] ? parseInt(req.query['category_id'] as string) : undefined;
-    const ai_status = req.query['ai_status'] as string;
-    const is_step_pick = req.query['is_step_pick'] as string;
-    const include_categories = req.query['include_categories'] === 'true';
 
     const pool = getDatabaseConnection();
     const connection = await pool.getConnection();
@@ -355,7 +409,7 @@ router.get('/', async (req, res) => {
       const [services] = await connection.execute<RowDataPacket[]>(
         `SELECT DISTINCT ai_services.* 
          FROM ai_services 
-         ${category_id ? 'LEFT JOIN category_display_order cdo ON ai_services.id = cdo.ai_service_id AND cdo.category_id = ?' : ''}
+         ${category_id ? 'LEFT JOIN ai_service_category_display_order cdo ON ai_services.id = cdo.ai_service_id AND cdo.category_id = ?' : ''}
          WHERE ${whereClause} 
          ORDER BY ${orderByClause}
          LIMIT ? OFFSET ?`,
@@ -468,9 +522,23 @@ router.get('/', async (req, res) => {
     }
   } catch (error) {
     console.error('Error fetching AI services:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      query_params: {
+        page: page,
+        limit: limit,
+        search: search,
+        category_id: category_id,
+        ai_status: ai_status,
+        is_step_pick: is_step_pick,
+        include_categories: include_categories
+      }
+    });
     res.status(500).json({
       success: false,
-      error: 'AI 서비스 조회 중 오류가 발생했습니다.'
+      error: 'AI 서비스 조회 중 오류가 발생했습니다.',
+      details: error.message
     });
   }
 });

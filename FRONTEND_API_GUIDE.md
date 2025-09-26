@@ -1048,6 +1048,73 @@ PUT /api/homepage-settings/trends/{sectionId}/services
 }
 ```
 
+#### 메인페이지 전체 설정 조회 (통합)
+```http
+GET /api/homepage-settings?category_id=1
+```
+**설명**: 메인페이지의 모든 설정(영상, 큐레이션, STEP PICK, 트렌드)을 한번에 조회
+
+**Query Parameters**:
+- `category_id` (optional): STEP PICK 데이터를 특정 카테고리로 필터링
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "videos": [
+      {
+        "id": 1,
+        "ai_video_id": 3,
+        "display_order": 1,
+        "is_active": true,
+        "video_title": "dify 사용",
+        "video_description": "<p>dify</p>",
+        "thumbnail_url": "https://img.youtube.com/vi/xWG4nYBZTsE/maxresdefault.jpg",
+        "video_duration": 0,
+        "view_count": 0
+      }
+    ],
+    "curations": [
+      {
+        "id": 1,
+        "curation_id": 1,
+        "display_order": 1,
+        "is_active": true,
+        "curation_title": "AI 글쓰기 도구 모음",
+        "curation_description": "글쓰기에 도움이 되는 AI 도구들",
+        "curation_thumbnail": "/images/curations/writing.jpg"
+      }
+    ],
+    "stepPick": [
+      {
+        "id": 1,
+        "ai_service_id": 1,
+        "category_id": 1,
+        "display_order": 1,
+        "is_active": true,
+        "ai_name": "ChatGPT",
+        "ai_description": "OpenAI의 대화형 인공지능 챗봇 서비스",
+        "ai_logo": null,
+        "company_name": "OpenAI",
+        "category_name": "AI 글쓰기"
+      }
+    ],
+    "trends": [
+      {
+        "id": 1,
+        "section_type": "popular",
+        "section_title": "요즘 많이 쓰는",
+        "section_description": "사용자들이 가장 많이 이용하는 인기 AI 서비스",
+        "is_category_based": 1,
+        "is_active": 1,
+        "display_order": 1
+      }
+    ]
+  }
+}
+```
+
 #### 추가 가능한 콘텐츠 조회
 ```http
 GET /api/homepage-settings/available-videos?search=&limit=50

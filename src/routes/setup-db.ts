@@ -126,4 +126,59 @@ router.post('/homepage-settings', async (req, res) => {
   }
 });
 
+// 카테고리 표시 순서 테이블 생성
+router.post('/category-display-order', async (req, res) => {
+  const connection = await getDatabaseConnection().getConnection();
+  
+  try {
+    await connection.beginTransaction();
+    
+    // 카테고리 표시 순서 테이블 생성 (올바른 테이블명 사용)
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS ai_service_category_display_order (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        category_id INT NOT NULL,
+        ai_service_id INT NOT NULL,
+        display_order INT DEFAULT 0,
+        is_featured BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE,
+        FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_category_service (category_id, ai_service_id)
+      )
+    `);
+    
+    // 인덱스 추가
+    try {
+      await connection.execute(`CREATE INDEX idx_ai_service_category_display_order_category ON ai_service_category_display_order(category_id)`);
+    } catch (error) {
+      console.log('Index already exists');
+    }
+    
+    try {
+      await connection.execute(`CREATE INDEX idx_ai_service_category_display_order_display_order ON ai_service_category_display_order(display_order)`);
+    } catch (error) {
+      console.log('Index already exists');
+    }
+
+    await connection.commit();
+    
+    res.json({
+      success: true,
+      message: '카테고리 표시 순서 테이블이 성공적으로 생성되었습니다.'
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Category display order table setup error:', error);
+    res.status(500).json({
+      success: false,
+      error: '카테고리 표시 순서 테이블 생성 중 오류가 발생했습니다.',
+      details: error.message
+    });
+  } finally {
+    connection.release();
+  }
+});
+
 export default router;
