@@ -23,6 +23,8 @@ import setupRouter from './routes/setup';
 import homepageSettingsRouter from './routes/homepageSettings';
 import adPartnershipsRouter from './routes/adPartnerships';
 import setupDbRouter from './routes/setup-db';
+import myPicksRouter from './routes/myPicks';
+import setupMyPicksRouter from './routes/setup-my-picks';
 
 const app = express();
 const PORT = parseInt(process.env['PORT'] || '3004');
@@ -293,6 +295,8 @@ app.use('/api/setup', setupRouter);
 app.use('/api/homepage-settings', homepageSettingsRouter);
 app.use('/api/ad-partnerships', adPartnershipsRouter);
 app.use('/api/setup-db', setupDbRouter);
+app.use('/api/my-picks', myPicksRouter);
+app.use('/api/setup', setupMyPicksRouter);
 
 // 헬스체크 엔드포인트
 app.get('/health', async (_req, res) => {

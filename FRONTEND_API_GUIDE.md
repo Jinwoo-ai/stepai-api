@@ -173,12 +173,40 @@ GET /api/homepage-settings/step-pick
 }
 ```
 
-### 5. 트렌드 섹션 목록 조회
+### 5. 메인 카테고리 목록 조회
+
+```http
+GET /api/homepage-settings/main-categories
+```
+**설명**: 메인페이지에서 사용할 수 있는 메인 카테고리 목록 조회
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "category_name": "문서·글쓰기",
+      "category_icon": "📝"
+    },
+    {
+      "id": 2,
+      "category_name": "이미지·영상",
+      "category_icon": "🎨"
+    }
+  ]
+}
+```
+
+## 🔥 트렌드 메뉴 API
+
+### 1. 트렌드 섹션 목록 조회
 
 ```http
 GET /api/homepage-settings/trends
 ```
-**설명**: 트렌드 섹션 설정 목록 조회
+**설명**: 트렌드 메뉴에 표시될 섹션 목록 조회 (어드민 설정)
 
 **Response**:
 ```json
@@ -216,12 +244,12 @@ GET /api/homepage-settings/trends
 }
 ```
 
-### 6. 트렌드 섹션별 서비스 조회 (카테고리별)
+### 2. 트렌드 섹션별 서비스 조회 (카테고리별)
 
 ```http
 GET /api/homepage-settings/trends/{sectionId}/services
 ```
-**설명**: 특정 트렌드 섹션의 AI 서비스 목록 조회 (카테고리별 지원)
+**설명**: 특정 트렌드 섹션의 AI 서비스 목록 조회 (카테고리별 필터링 지원)
 
 **Query Parameters**:
 - `category_id` (선택사항): 특정 카테고리의 서비스만 조회
@@ -244,32 +272,6 @@ GET /api/homepage-settings/trends/{sectionId}/services
       "company_name": "Anthropic",
       "is_step_pick": false,
       "category_name": "문서·글쓰기"
-    }
-  ]
-}
-```
-
-### 7. 메인 카테고리 목록 조회
-
-```http
-GET /api/homepage-settings/main-categories
-```
-**설명**: 메인페이지에서 사용할 수 있는 메인 카테고리 목록 조회
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "category_name": "문서·글쓰기",
-      "category_icon": "📝"
-    },
-    {
-      "id": 2,
-      "category_name": "이미지·영상",
-      "category_icon": "🎨"
     }
   ]
 }
@@ -442,6 +444,270 @@ GET /api/search?q=검색어&type=all
 ## 📊 통계 API
 
 ### 1. 대시보드 통계
+```http
+GET /api/dashboard/stats
+```
+**설명**: 전체 통계 정보 조회
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "totalUsers": 1250,
+    "newUsers": 45,
+    "totalAIServices": 156,
+    "totalVideos": 89,
+    "totalCategories": 24,
+    "stepPickServices": 12,
+    "activeServices": 142,
+    "totalViews": 15420
+  }
+}
+```
+
+## ❤️ MY PICK API
+
+### 1. 관심 AI 서비스 목록 조회
+
+```http
+GET /api/my-picks/services
+```
+**설명**: 로그인한 사용자가 관심 등록한 AI 서비스 목록 조회
+
+**Headers**:
+- `user-id`: 사용자 ID (필수)
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "ai_service_id": 5,
+      "created_at": "2024-01-15T10:00:00Z",
+      "ai_name": "ChatGPT",
+      "ai_description": "OpenAI의 대화형 AI 모델",
+      "ai_logo": "/uploads/icons/chatgpt.png",
+      "company_name": "OpenAI",
+      "is_step_pick": true
+    }
+  ]
+}
+```
+
+### 2. AI 서비스 관심 등록
+
+```http
+POST /api/my-picks/services/{serviceId}
+```
+**설명**: AI 서비스를 관심 목록에 추가
+
+**Headers**:
+- `user-id`: 사용자 ID (필수)
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "관심 서비스로 등록되었습니다."
+}
+```
+
+### 3. AI 서비스 관심 해제
+
+```http
+DELETE /api/my-picks/services/{serviceId}
+```
+**설명**: AI 서비스를 관심 목록에서 제거
+
+**Headers**:
+- `user-id`: 사용자 ID (필수)
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "관심 서비스에서 제거되었습니다."
+}
+```
+
+### 4. 관심 영상 목록 조회
+
+```http
+GET /api/my-picks/videos
+```
+**설명**: 로그인한 사용자가 관심 등록한 영상 목록 조회
+
+**Headers**:
+- `user-id`: 사용자 ID (필수)
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "ai_video_id": 3,
+      "created_at": "2024-01-15T10:00:00Z",
+      "video_title": "ChatGPT 완벽 활용법",
+      "video_description": "ChatGPT를 업무에 활용하는 방법",
+      "thumbnail_url": "https://img.youtube.com/vi/.../maxresdefault.jpg",
+      "video_duration": 630,
+      "view_count": 1500
+    }
+  ]
+}
+```
+
+### 5. 영상 관심 등록
+
+```http
+POST /api/my-picks/videos/{videoId}
+```
+**설명**: 영상을 관심 목록에 추가
+
+**Headers**:
+- `user-id`: 사용자 ID (필수)
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "관심 영상으로 등록되었습니다."
+}
+```
+
+### 6. 영상 관심 해제
+
+```http
+DELETE /api/my-picks/videos/{videoId}
+```
+**설명**: 영상을 관심 목록에서 제거
+
+**Headers**:
+- `user-id`: 사용자 ID (필수)
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "관심 영상에서 제거되었습니다."
+}
+```
+
+### 7. 통합 관심 목록 조회
+
+```http
+GET /api/my-picks
+```
+**설명**: 관심 등록한 모든 항목 조회 (AI 서비스 + 영상)
+
+**Headers**:
+- `user-id`: 사용자 ID (필수)
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "services": [
+      {
+        "type": "service",
+        "item_id": 5,
+        "created_at": "2024-01-15T10:00:00Z",
+        "title": "ChatGPT",
+        "description": "OpenAI의 대화형 AI 모델",
+        "image_url": "/uploads/icons/chatgpt.png",
+        "company_name": "OpenAI"
+      }
+    ],
+    "videos": [
+      {
+        "type": "video",
+        "item_id": 3,
+        "created_at": "2024-01-15T09:00:00Z",
+        "title": "ChatGPT 완벽 활용법",
+        "description": "ChatGPT를 업무에 활용하는 방법",
+        "image_url": "https://img.youtube.com/vi/.../maxresdefault.jpg",
+        "company_name": null
+      }
+    ],
+    "all": [
+      {
+        "type": "service",
+        "item_id": 5,
+        "created_at": "2024-01-15T10:00:00Z",
+        "title": "ChatGPT",
+        "description": "OpenAI의 대화형 AI 모델",
+        "image_url": "/uploads/icons/chatgpt.png",
+        "company_name": "OpenAI"
+      },
+      {
+        "type": "video",
+        "item_id": 3,
+        "created_at": "2024-01-15T09:00:00Z",
+        "title": "ChatGPT 완벽 활용법",
+        "description": "ChatGPT를 업무에 활용하는 방법",
+        "image_url": "https://img.youtube.com/vi/.../maxresdefault.jpg",
+        "company_name": null
+      }
+    ]
+  }
+}
+```
+
+## 👥 회원관리 API
+
+### 1. SNS 로그인/회원가입
+```http
+POST /api/users/sns-login
+```
+**설명**: SNS 계정으로 로그인 또는 회원가입 및 액세스 토큰 발급
+
+**Request Body**:
+```json
+{
+  "sns_type": "naver",
+  "sns_user_id": "naver_12345",
+  "name": "김철수",
+  "email": "kim@naver.com",
+  "industry": "IT",
+  "job_role": "개발자",
+  "job_level": "대리",
+  "experience_years": 3
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": 1,
+      "name": "김철수",
+      "email": "kim@naver.com",
+      "industry": "IT",
+      "job_role": "개발자",
+      "job_level": "대리",
+      "experience_years": 3,
+      "user_type": "member",
+      "user_status": "active",
+      "created_at": "2024-01-15T10:00:00Z",
+      "sns_accounts": [
+        {
+          "sns_type": "naver",
+          "sns_user_id": "naver_12345"
+        }
+      ]
+    },
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```# 1. 대시보드 통계
 ```http
 GET /api/dashboard/stats
 ```
