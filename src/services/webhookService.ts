@@ -1,4 +1,4 @@
-import axios from 'axios';
+import * as axios from 'axios';
 
 interface UserWebhookData {
   id: number;
@@ -52,7 +52,7 @@ export class WebhookService {
         }
       }];
 
-      const response = await axios.post(this.getWebhookUrl(), payload, {
+      const response = await axios.default.post(this.getWebhookUrl(), payload, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.WEBHOOK_TOKEN}`
@@ -87,7 +87,7 @@ export class WebhookService {
         data
       }];
 
-      const response = await axios.post(this.getWebhookUrl(), payload, {
+      const response = await axios.default.post(this.getWebhookUrl(), payload, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.WEBHOOK_TOKEN}`

@@ -29,6 +29,7 @@
   "author": "StepAI Team",
   "license": "MIT",
   "dependencies": {
+    "@types/axios": "^0.14.4",
     "@types/bcrypt": "^6.0.0",
     "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
