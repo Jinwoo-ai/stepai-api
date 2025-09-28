@@ -179,7 +179,7 @@ router.post('/upload-icon', imageUpload.single('icon'), async (req, res) => {
 
 
 
-// AI 서비스 검색
+// AI 서비스 검색 (웹훅 연동)
 router.get('/search', async (req, res) => {
   try {
     const query = req.query['q'] as string;
@@ -187,26 +187,77 @@ router.get('/search', async (req, res) => {
       return res.json({ success: true, data: [] });
     }
 
-    const pool = getDatabaseConnection();
-    const connection = await pool.getConnection();
+    // 웹훅 URL 결정 (환경에 따라)
+    const environment = process.env.NODE_ENV || 'development';
+    const webhookUrl = environment === 'production' 
+      ? 'https://stepai.app.n8n.cloud/webhook/71c95f80-ad76-480f-8283-d5d487fe91fa'
+      : 'https://stepai.app.n8n.cloud/webhook-test/71c95f80-ad76-480f-8283-d5d487fe91fa';
     
     try {
-      const [services] = await connection.execute<RowDataPacket[]>(
-        `SELECT id, ai_name, ai_name_en, ai_logo, company_name 
-         FROM ai_services 
-         WHERE (ai_name LIKE ? OR ai_name_en LIKE ? OR company_name LIKE ?) 
-         AND deleted_at IS NULL AND ai_status = 'active'
-         ORDER BY ai_name
-         LIMIT 20`,
-        [`%${query}%`, `%${query}%`, `%${query}%`]
-      );
+      // 웹훅으로 검색 요청
+      const axios = require('axios');
+      const webhookResponse = await axios.get(webhookUrl, {
+        params: {
+          message: query
+        },
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'stepai-search-api/1.0'
+        },
+        timeout: 10000 // 10초 타임아웃
+      });
       
-      res.json({ success: true, data: services });
-    } finally {
-      connection.release();
+      console.log('웹훅 검색 성공:', {
+        status: webhookResponse.status,
+        query: query,
+        url: webhookUrl,
+        dataType: typeof webhookResponse.data,
+        dataLength: webhookResponse.data ? (Array.isArray(webhookResponse.data) ? webhookResponse.data.length : 'not array') : 'no data'
+      });
+      
+      // 웹훅에서 받은 결과를 그대로 리턴
+      res.json({
+        success: true,
+        data: webhookResponse.data || [],
+        source: 'webhook'
+      });
+      
+    } catch (webhookError) {
+      console.error('웹훅 검색 실패:', {
+        message: webhookError.message,
+        status: webhookError.response?.status,
+        statusText: webhookError.response?.statusText,
+        data: webhookError.response?.data,
+        url: webhookUrl,
+        query: query
+      });
+      
+      // 웹훅 실패 시 기존 DB 검색으로 폴백
+      const pool = getDatabaseConnection();
+      const connection = await pool.getConnection();
+      
+      try {
+        const [services] = await connection.execute<RowDataPacket[]>(
+          `SELECT id, ai_name, ai_name_en, ai_logo, company_name 
+           FROM ai_services 
+           WHERE (ai_name LIKE ? OR ai_name_en LIKE ? OR company_name LIKE ?) 
+           AND deleted_at IS NULL AND ai_status = 'active'
+           ORDER BY ai_name
+           LIMIT 20`,
+          [`%${query}%`, `%${query}%`, `%${query}%`]
+        );
+        
+        res.json({ 
+          success: true, 
+          data: services,
+          source: 'fallback'
+        });
+      } finally {
+        connection.release();
+      }
     }
   } catch (error) {
-    console.error('Error searching AI services:', error);
+    console.error('Error in search API:', error);
     res.status(500).json({
       success: false,
       error: 'AI 서비스 검색 중 오류가 발생했습니다.'
@@ -407,7 +458,8 @@ router.get('/', async (req, res) => {
       }
       
       const [services] = await connection.execute<RowDataPacket[]>(
-        `SELECT DISTINCT ai_services.* 
+        `SELECT DISTINCT ai_services.*, 
+                COALESCE(ai_services.ai_name_en, '') as ai_name_en
          FROM ai_services 
          ${category_id ? 'LEFT JOIN ai_service_category_display_order cdo ON ai_services.id = cdo.ai_service_id AND cdo.category_id = ?' : ''}
          WHERE ${whereClause} 

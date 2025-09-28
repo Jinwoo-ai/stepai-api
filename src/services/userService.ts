@@ -1,6 +1,7 @@
 import mysql from 'mysql2/promise';
 import { dbConfig } from '../configs/database';
 import { TokenService } from '../utils/jwt';
+import { WebhookService } from './webhookService';
 import { 
   User, 
   UserSns,
@@ -35,19 +36,32 @@ export class UserService {
       );
 
       let userId: number;
+      let isNewUser = false;
 
       if ((snsRows as any[]).length > 0) {
         // 기존 사용자
         userId = (snsRows as any[])[0].user_id;
       } else {
-        // 새 사용자 생성
+        // 새 사용자 생성 - 필수 필드만 체크
+        if (!data.name || !data.email || !data.sns_type || !data.sns_user_id) {
+          throw new Error('필수 정보가 누락되었습니다. (name, email, sns_type, sns_user_id)');
+        }
+        
         const [userResult] = await connection.execute(
           `INSERT INTO users (name, email, industry, job_role, job_level, experience_years) 
            VALUES (?, ?, ?, ?, ?, ?)`,
-          [data.name, data.email, data.industry, data.job_role, data.job_level, data.experience_years]
+          [
+            data.name, 
+            data.email, 
+            data.industry || null, 
+            data.job_role || null, 
+            data.job_level || null, 
+            data.experience_years || null
+          ]
         );
 
         userId = (userResult as any).insertId;
+        isNewUser = true;
 
         // SNS 정보 저장
         await connection.execute(
@@ -64,6 +78,27 @@ export class UserService {
       );
 
       const user = await this.getById(userId);
+      
+      // 새 사용자인 경우 웹훅 전송
+      if (isNewUser) {
+        // 웹훅은 비동기로 전송하되 에러가 발생해도 회원가입 프로세스는 계속 진행
+        WebhookService.sendUserCreatedWebhook({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          industry: user.industry,
+          jobRole: user.job_role,
+          jobLevel: user.job_level,
+          experienceYears: user.experience_years,
+          userType: user.user_type,
+          userStatus: user.user_status,
+          createdAt: user.created_at.toISOString(),
+          updatedAt: user.updated_at.toISOString()
+        }).catch(error => {
+          console.error('웹훅 전송 중 오류 발생:', error);
+        });
+      }
+      
       return { user, token, expiresAt };
     } finally {
       await connection.end();

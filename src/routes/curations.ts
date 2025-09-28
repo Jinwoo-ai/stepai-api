@@ -331,20 +331,32 @@ router.get('/:curationId/services', async (req, res) => {
         cas.ai_service_id,
         cas.service_order,
         ais.ai_name,
+        COALESCE(ais.ai_name_en, '') as ai_name_en,
         ais.ai_description,
         ais.ai_logo,
         ais.company_name,
         ais.pricing_info,
         ais.difficulty_level,
-        ais.is_step_pick
+        ais.is_step_pick,
+        GROUP_CONCAT(DISTINCT t.tag_name) as tags
       FROM curation_ai_services cas
       JOIN ai_services ais ON cas.ai_service_id = ais.id
+      LEFT JOIN ai_service_tags ast ON ais.id = ast.ai_service_id
+      LEFT JOIN tags t ON ast.tag_id = t.id
       WHERE cas.curation_id = ? AND ais.ai_status = 'active'
+      GROUP BY cas.id, cas.ai_service_id, cas.service_order, ais.ai_name, ais.ai_name_en, ais.ai_description, ais.ai_logo, ais.company_name, ais.pricing_info, ais.difficulty_level, ais.is_step_pick
       ORDER BY cas.service_order ASC
     `;
 
     const [rows] = await pool.execute<RowDataPacket[]>(query, [curationId]);
-    res.json({ success: true, data: rows });
+    
+    // tags 필드를 배열로 변환
+    const processedRows = rows.map(row => ({
+      ...row,
+      tags: row.tags ? row.tags.split(',') : []
+    }));
+    
+    res.json({ success: true, data: processedRows });
   } catch (error) {
     console.error('큐레이션 서비스 조회 실패:', error);
     res.status(500).json({ success: false, error: '큐레이션 서비스 조회에 실패했습니다.' });
