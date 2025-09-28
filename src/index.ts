@@ -55,7 +55,9 @@ app.use((req, res, next) => {
 // 정적 파일 서빙
 app.use('/assets', express.static(path.join(__dirname, '../public/assets')));
 app.use('/public', express.static(path.join(__dirname, '../public')));
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
+// 첨부파일용 업로드 폴더
+app.use('/uploads/attachments', express.static(path.join(__dirname, '../uploads/attachments')));
 
 // Swagger 설정
 const swaggerOptions = {
