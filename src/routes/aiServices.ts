@@ -218,7 +218,7 @@ router.get('/search', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const include_categories = req.query['include_categories'] === 'true';
+    const include_categories = req.query['include_categories'] !== 'false'; // 기본값을 true로 변경
     
     if (isNaN(id)) {
       return res.status(400).json({

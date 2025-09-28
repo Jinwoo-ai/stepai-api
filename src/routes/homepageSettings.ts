@@ -372,6 +372,16 @@ router.get('/trends/:sectionId/services', async (req, res) => {
     const pool = getDatabaseConnection();
     const sectionId = parseInt(req.params.sectionId);
     const categoryId = req.query.category_id as string;
+    // Authorization 헤더에서 사용자 ID 추출 (실제로는 토큰 검증 로직 필요)
+    let userId = null;
+    if (req.headers.authorization) {
+      const token = req.headers.authorization.replace('Bearer ', '');
+      // 실제 구현에서는 토큰을 검증하고 사용자 ID를 추출해야 함
+      // 여기서는 간단히 숫자인 경우만 처리
+      if (!isNaN(parseInt(token))) {
+        userId = parseInt(token);
+      }
+    }
     
     let query = `
       SELECT 
@@ -386,24 +396,73 @@ router.get('/trends/:sectionId/services', async (req, res) => {
         ais.ai_logo,
         ais.company_name,
         ais.is_step_pick,
-        c.category_name
+        ais.created_at,
+        CASE WHEN ais.created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH) THEN true ELSE false END as is_new,
+        c.category_name,
+        GROUP_CONCAT(DISTINCT t.tag_name) as tags
+    `;
+    
+    // 로그인된 유저인 경우 북마크 정보 추가
+    if (userId) {
+      query += `,
+        CASE WHEN uf.id IS NOT NULL THEN true ELSE false END as is_bookmarked`;
+    }
+    
+    query += `
       FROM trend_section_services tss
       JOIN ai_services ais ON tss.ai_service_id = ais.id
       LEFT JOIN categories c ON tss.category_id = c.id
+      LEFT JOIN ai_service_tags ast ON ais.id = ast.ai_service_id
+      LEFT JOIN tags t ON ast.tag_id = t.id
+    `;
+    
+    // 로그인된 유저인 경우 user_favorites 테이블 조인
+    if (userId) {
+      query += `
+      LEFT JOIN user_favorites uf ON ais.id = uf.favorite_id AND uf.user_id = ? AND uf.favorite_type = 'ai_service'
+      `;
+    }
+    
+    query += `
       WHERE tss.trend_section_id = ? AND tss.is_active = TRUE
     `;
     
-    const params: any[] = [sectionId];
+    const params: any[] = [];
+    if (userId) {
+      params.push(userId);
+    }
+    params.push(sectionId);
     
     if (categoryId) {
       query += ` AND tss.category_id = ?`;
       params.push(categoryId);
     }
     
-    query += ` ORDER BY tss.category_id ASC, tss.is_featured DESC, tss.display_order ASC`;
+    query += `
+      GROUP BY tss.id, tss.ai_service_id, tss.category_id, tss.display_order, tss.is_featured, tss.is_active, 
+               ais.ai_name, ais.ai_description, ais.ai_logo, ais.company_name, ais.is_step_pick, ais.created_at, 
+               c.category_name`;
+    
+    if (userId) {
+      query += `, uf.id`;
+    }
+    
+    query += `
+      ORDER BY tss.category_id ASC, tss.is_featured DESC, tss.display_order ASC
+    `;
 
     const [rows] = await pool.execute<RowDataPacket[]>(query, params);
-    res.json({ success: true, data: rows });
+    
+    // tags 필드를 배열로 변환하고 is_new 계산
+    const processedRows = rows.map(row => ({
+      ...row,
+      tags: row.tags ? row.tags.split(',') : [],
+      is_new: !!row.is_new,
+      is_bookmarked: userId ? !!row.is_bookmarked : undefined,
+      created_at: undefined // 클라이언트에서는 숨김
+    }));
+    
+    res.json({ success: true, data: processedRows });
   } catch (error) {
     console.error('트렌드 섹션 서비스 조회 실패:', error);
     res.status(500).json({ success: false, error: '트렌드 섹션 서비스 조회에 실패했습니다.' });
