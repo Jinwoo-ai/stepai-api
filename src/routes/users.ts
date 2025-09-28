@@ -57,6 +57,94 @@ router.post('/logout', async (req: Request, res: Response) => {
   }
 });
 
+// 내 정보 조회 (특정 경로를 먼저 정의)
+router.get('/me', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const user = await userService.getById(userId);
+    
+    const response: ApiResponse = {
+      success: true,
+      data: user
+    };
+    
+    res.json(response);
+  } catch (error) {
+    const response: ApiResponse = {
+      success: false,
+      error: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'
+    };
+    
+    res.status(404).json(response);
+  }
+});
+
+// 내 정보 수정
+router.put('/me', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const user = await userService.update(userId, req.body);
+    
+    const response: ApiResponse = {
+      success: true,
+      data: user,
+      message: '사용자 정보가 성공적으로 수정되었습니다.'
+    };
+    
+    res.json(response);
+  } catch (error) {
+    const response: ApiResponse = {
+      success: false,
+      error: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'
+    };
+    
+    res.status(400).json(response);
+  }
+});
+
+// 회원탈퇴
+router.delete('/me', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    await userService.withdraw(userId);
+    
+    const response: ApiResponse = {
+      success: true,
+      message: '회원탈퇴가 성공적으로 처리되었습니다.'
+    };
+    
+    res.json(response);
+  } catch (error) {
+    const response: ApiResponse = {
+      success: false,
+      error: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'
+    };
+    
+    res.status(400).json(response);
+  }
+});
+
+// 사용자 통계 (관리자용)
+router.get('/stats/overview', async (req: Request, res: Response) => {
+  try {
+    const stats = await userService.getStats();
+    
+    const response: ApiResponse = {
+      success: true,
+      data: stats
+    };
+    
+    res.json(response);
+  } catch (error) {
+    const response: ApiResponse = {
+      success: false,
+      error: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'
+    };
+    
+    res.status(500).json(response);
+  }
+});
+
 // 사용자 목록 조회 (관리자용)
 router.get('/', async (req: Request, res: Response) => {
   try {
@@ -155,94 +243,6 @@ router.delete('/:id', async (req: Request, res: Response) => {
     };
     
     res.status(404).json(response);
-  }
-});
-
-// 사용자 통계 (관리자용)
-router.get('/stats/overview', async (req: Request, res: Response) => {
-  try {
-    const stats = await userService.getStats();
-    
-    const response: ApiResponse = {
-      success: true,
-      data: stats
-    };
-    
-    res.json(response);
-  } catch (error) {
-    const response: ApiResponse = {
-      success: false,
-      error: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'
-    };
-    
-    res.status(500).json(response);
-  }
-});
-
-// 내 정보 조회
-router.get('/me', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    const user = await userService.getById(userId);
-    
-    const response: ApiResponse = {
-      success: true,
-      data: user
-    };
-    
-    res.json(response);
-  } catch (error) {
-    const response: ApiResponse = {
-      success: false,
-      error: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'
-    };
-    
-    res.status(404).json(response);
-  }
-});
-
-// 내 정보 수정
-router.put('/me', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    const user = await userService.update(userId, req.body);
-    
-    const response: ApiResponse = {
-      success: true,
-      data: user,
-      message: '사용자 정보가 성공적으로 수정되었습니다.'
-    };
-    
-    res.json(response);
-  } catch (error) {
-    const response: ApiResponse = {
-      success: false,
-      error: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'
-    };
-    
-    res.status(400).json(response);
-  }
-});
-
-// 회원탈퇴
-router.delete('/me', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    await userService.withdraw(userId);
-    
-    const response: ApiResponse = {
-      success: true,
-      message: '회원탈퇴가 성공적으로 처리되었습니다.'
-    };
-    
-    res.json(response);
-  } catch (error) {
-    const response: ApiResponse = {
-      success: false,
-      error: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'
-    };
-    
-    res.status(400).json(response);
   }
 });
 
