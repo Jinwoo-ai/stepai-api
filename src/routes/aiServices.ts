@@ -499,6 +499,11 @@ router.get('/', async (req, res) => {
   const ai_status = req.query['ai_status'] as string;
   const is_step_pick = req.query['is_step_pick'] as string;
   const is_new = req.query['is_new'] as string;
+  const pricing_model = req.query['pricing_model'] as string;
+  const ai_type = req.query['ai_type'] as string;
+  const difficulty_level = req.query['difficulty_level'] as string;
+  const nationality = req.query['nationality'] as string;
+  const sort = req.query['sort'] as string;
   const include_categories = req.query['include_categories'] === 'true';
   
   try {
@@ -536,6 +541,37 @@ router.get('/', async (req, res) => {
         queryParams.push(is_new === 'true');
       }
 
+      if (pricing_model) {
+        const pricingModels = pricing_model.split(',').map(model => model.trim());
+        const placeholders = pricingModels.map(() => '?').join(',');
+        whereConditions.push(`EXISTS (SELECT 1 FROM ai_service_pricing_models aspm INNER JOIN pricing_models pm ON aspm.pricing_model_id = pm.id WHERE aspm.ai_service_id = ai_services.id AND pm.model_name IN (${placeholders}))`);
+        queryParams.push(...pricingModels);
+      }
+
+      if (ai_type) {
+        const aiTypes = ai_type.split(',').map(type => type.trim());
+        const placeholders = aiTypes.map(() => '?').join(',');
+        whereConditions.push(`EXISTS (SELECT 1 FROM ai_service_types ast INNER JOIN ai_types at ON ast.ai_type_id = at.id WHERE ast.ai_service_id = ai_services.id AND at.type_name IN (${placeholders}))`);
+        queryParams.push(...aiTypes);
+      }
+
+      if (difficulty_level) {
+        const difficultyLevels = difficulty_level.split(',').map(level => level.trim());
+        const placeholders = difficultyLevels.map(() => '?').join(',');
+        whereConditions.push(`ai_services.difficulty_level IN (${placeholders})`);
+        queryParams.push(...difficultyLevels);
+      }
+
+      if (nationality) {
+        if (nationality === 'domestic') {
+          whereConditions.push('ai_services.headquarters = ?');
+          queryParams.push('대한민국');
+        } else if (nationality === 'overseas') {
+          whereConditions.push('(ai_services.headquarters IS NULL OR ai_services.headquarters != ?)');
+          queryParams.push('대한민국');
+        }
+      }
+
       const whereClause = whereConditions.join(' AND ');
 
       // 전체 개수 조회
@@ -547,9 +583,16 @@ router.get('/', async (req, res) => {
       const total = countResult[0]?.['total'] || 0;
       const totalPages = Math.ceil(total / limit);
 
-      // AI 서비스 목록 조회 (카테고리 표시순서 우선 적용)
+      // AI 서비스 목록 조회 (정렬 옵션 적용)
       let orderByClause = 'ai_services.created_at DESC';
-      if (category_id) {
+      
+      if (sort === 'popular') {
+        orderByClause = 'ai_services.view_count DESC, ai_services.created_at DESC';
+      } else if (sort === 'latest') {
+        orderByClause = 'ai_services.created_at DESC';
+      } else if (sort === 'name') {
+        orderByClause = 'ai_services.ai_name ASC';
+      } else if (category_id) {
         orderByClause = `
           CASE WHEN cdo.display_order IS NOT NULL THEN 0 ELSE 1 END,
           cdo.display_order ASC,
@@ -561,11 +604,11 @@ router.get('/', async (req, res) => {
         `SELECT DISTINCT ai_services.*, 
                 COALESCE(ai_services.ai_name_en, '') as ai_name_en
          FROM ai_services 
-         ${category_id ? 'LEFT JOIN ai_service_category_display_order cdo ON ai_services.id = cdo.ai_service_id AND cdo.category_id = ?' : ''}
+         ${category_id && !sort ? 'LEFT JOIN ai_service_category_display_order cdo ON ai_services.id = cdo.ai_service_id AND cdo.category_id = ?' : ''}
          WHERE ${whereClause} 
          ORDER BY ${orderByClause}
          LIMIT ? OFFSET ?`,
-        category_id ? [category_id, ...queryParams, limit, offset] : [...queryParams, limit, offset]
+        (category_id && !sort) ? [category_id, ...queryParams, limit, offset] : [...queryParams, limit, offset]
       );
 
       // 카테고리 정보 포함

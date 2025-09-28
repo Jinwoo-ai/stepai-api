@@ -323,7 +323,7 @@ GET /api/categories
 
 ### 2. 카테고리별 AI 서비스 조회
 ```http
-GET /api/ai-services?category_id=1&ai_status=active&include_categories=true&page=1&limit=20
+GET /api/ai-services?category_id=1&ai_status=active&include_categories=true&page=1&limit=20&difficulty_level=beginner,intermediate&pricing_model=free,freemium&nationality=domestic
 ```
 **설명**: 특정 카테고리의 AI 서비스 목록 조회 (페이지네이션 포함)
 
@@ -336,7 +336,23 @@ GET /api/ai-services?category_id=1&ai_status=active&include_categories=true&page
 - `search`: 검색어 (선택사항)
 - `pricing_model`: 가격 모델 필터 (free, freemium, paid)
 - `ai_type`: AI 타입 필터 (WEB, MOB, API, DES, EXT)
+- `difficulty_level`: 난이도 필터 (beginner, intermediate, advanced) - 콤마로 구분하여 다중 선택 가능
+- `nationality`: 국가별 필터 (domestic, overseas)
 - `sort`: 정렬 방식 (popular, latest, name)
+
+**필터 옵션 설명**:
+- `difficulty_level`: 
+  - `beginner`: 초급 (누구나 쉽게 사용 가능)
+  - `intermediate`: 중급 (기본적인 AI 지식 필요)
+  - `advanced`: 고급 (전문적인 지식이나 기술적 배경 필요)
+  - 다중 선택: `difficulty_level=beginner,intermediate`
+- `pricing_model`:
+  - 다중 선택: `pricing_model=free,freemium`
+- `ai_type`:
+  - 다중 선택: `ai_type=WEB,MOB`
+- `nationality`:
+  - `domestic`: 국내 (한국 기업 또는 한국어 지원 우선)
+  - `overseas`: 해외 (외국 기업 또는 영어 기반 서비스)
 
 ## 🤖 AI 서비스 상세 페이지 API
 
