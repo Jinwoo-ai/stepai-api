@@ -254,6 +254,9 @@ GET /api/homepage-settings/trends/{sectionId}/services
 **Query Parameters**:
 - `category_id` (선택사항): 특정 카테고리의 서비스만 조회
 
+**Headers** (로그인된 사용자의 경우):
+- `Authorization: Bearer {user_id}`: 북마크 정보 포함을 위한 사용자 인증
+
 **Response**:
 ```json
 {
@@ -271,11 +274,19 @@ GET /api/homepage-settings/trends/{sectionId}/services
       "ai_logo": "/uploads/icons/claude.png",
       "company_name": "Anthropic",
       "is_step_pick": false,
-      "category_name": "문서·글쓰기"
+      "is_new": true,
+      "category_name": "문서·글쓰기",
+      "tags": ["AI글쓰기", "대화형에이전트"],
+      "is_bookmarked": false
     }
   ]
 }
 ```
+
+**필드 설명**:
+- `is_new`: 생성일자가 한달 이내인 경우 `true`
+- `tags`: AI 서비스에 연결된 태그 목록 (배열)
+- `is_bookmarked`: 로그인된 사용자의 경우만 포함, `user_favorites` 테이블 기반
 
 ## 📂 카테고리 페이지 API
 
@@ -1480,7 +1491,144 @@ GET /api/setup/check-tables
 
 ## 📚 큐레이션 API
 
-### 1. 큐레이션별 AI 서비스 조회
+### 1. 큐레이션 목록 조회
+
+```http
+GET /api/curations
+```
+**설명**: 큐레이션 목록 조회 (페이지네이션 지원)
+
+**Query Parameters**:
+- `page`: 페이지 번호 (기본값: 1)
+- `limit`: 페이지당 항목 수 (기본값: 20)
+- `search`: 검색어 (선택사항)
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "data": [
+      {
+        "id": 1,
+        "curation_title": "CEO's P!CK AI서비스",
+        "curation_description": "<p>CEO의 선택</p>",
+        "curation_thumbnail": "",
+        "curation_order": 3,
+        "curation_status": "active",
+        "created_at": "2025-09-19T07:34:33.000Z",
+        "updated_at": "2025-09-24T18:59:31.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 3,
+      "totalPages": 1
+    }
+  }
+}
+```
+
+### 2. 큐레이션 상세 조회
+
+```http
+GET /api/curations/{id}
+```
+**설명**: 특정 큐레이션의 상세 정보 조회
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "curation_title": "CEO's P!CK AI서비스",
+    "curation_description": "<p>CEO의 선택</p>",
+    "curation_thumbnail": "",
+    "curation_order": 3,
+    "curation_status": "active",
+    "created_at": "2025-09-19T07:34:33.000Z",
+    "updated_at": "2025-09-24T18:59:31.000Z"
+  }
+}
+```
+
+### 3. 큐레이션 생성
+
+```http
+POST /api/curations
+```
+**설명**: 새로운 큐레이션 생성
+
+**Request Body**:
+```json
+{
+  "curation_title": "새로운 큐레이션",
+  "curation_description": "<p>큐레이션 설명</p>",
+  "curation_thumbnail": "/uploads/thumbnails/curation.jpg",
+  "curation_order": 1
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 4,
+    "curation_title": "새로운 큐레이션",
+    "curation_description": "<p>큐레이션 설명</p>",
+    "curation_thumbnail": "/uploads/thumbnails/curation.jpg",
+    "curation_order": 1,
+    "curation_status": "active"
+  },
+  "message": "큐레이션이 성공적으로 생성되었습니다."
+}
+```
+
+### 4. 큐레이션 수정
+
+```http
+PUT /api/curations/{id}
+```
+**설명**: 기존 큐레이션 정보 수정
+
+**Request Body**:
+```json
+{
+  "curation_title": "수정된 큐레이션",
+  "curation_description": "<p>수정된 설명</p>",
+  "curation_thumbnail": "/uploads/thumbnails/updated.jpg",
+  "curation_order": 2,
+  "curation_status": "active"
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "큐레이션이 성공적으로 수정되었습니다."
+}
+```
+
+### 5. 큐레이션 삭제
+
+```http
+DELETE /api/curations/{id}
+```
+**설명**: 큐레이션 삭제 (소프트 삭제)
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "큐레이션이 성공적으로 삭제되었습니다."
+}
+```
+
+### 6. 큐레이션별 AI 서비스 조회
 
 ```http
 GET /api/curations/{curationId}/services
@@ -1506,20 +1654,56 @@ GET /api/curations/{curationId}/services
       "pricing_info": "유료, 무료",
       "difficulty_level": "초급",
       "is_step_pick": 1
-    },
-    {
-      "id": 74,
-      "ai_service_id": 39,
-      "service_order": 2,
-      "ai_name": "ChatPDF",
-      "ai_description": "AI 기반 PDF 챗봇 서비스",
-      "ai_logo": "https://stepai-admin-production.up.railway.app/uploads/icons/00039_ChatPDF.png",
-      "company_name": "챗피디에프 GmbH",
-      "pricing_info": "유료, 무료",
-      "difficulty_level": "초급",
-      "is_step_pick": 1
     }
   ]
+}
+```
+
+### 7. 큐레이션에 AI 서비스 추가
+
+```http
+POST /api/curations/{curationId}/services
+```
+**설명**: 큐레이션에 AI 서비스 추가
+
+**Request Body**:
+```json
+{
+  "ai_service_id": 1,
+  "service_order": 1
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 75,
+    "curation_id": 1,
+    "ai_service_id": 1,
+    "service_order": 1
+  },
+  "message": "큐레이션에 AI 서비스가 성공적으로 추가되었습니다."
+}
+```
+
+### 8. 큐레이션에서 AI 서비스 제거
+
+```http
+DELETE /api/curations/{curationId}/services/{serviceId}
+```
+**설명**: 큐레이션에서 특정 AI 서비스 제거
+
+**Path Parameters**:
+- `curationId`: 큐레이션 ID
+- `serviceId`: AI 서비스 ID
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "큐레이션에서 AI 서비스가 성공적으로 제거되었습니다."
 }
 ```
 

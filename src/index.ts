@@ -58,6 +58,8 @@ app.use('/public', express.static(path.join(__dirname, '../public')));
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 // 첨부파일용 업로드 폴더
 app.use('/uploads/attachments', express.static(path.join(__dirname, '../uploads/attachments')));
+// API 가이드 문서 서빙
+app.use('/docs', express.static(path.join(__dirname, '../')));
 
 // Swagger 설정
 const swaggerOptions = {

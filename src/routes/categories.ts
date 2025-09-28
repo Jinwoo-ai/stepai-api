@@ -139,6 +139,59 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// 카테고리 상태 토글
+router.patch('/:id/status', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { category_status } = req.body;
+
+    if (isNaN(id)) {
+      return res.status(400).json({
+        success: false,
+        error: '유효하지 않은 ID입니다.'
+      });
+    }
+
+    if (!category_status || !['active', 'inactive'].includes(category_status)) {
+      return res.status(400).json({
+        success: false,
+        error: '유효하지 않은 상태값입니다. (active 또는 inactive)'
+      });
+    }
+
+    const pool = getDatabaseConnection();
+    const connection = await pool.getConnection();
+    
+    try {
+      const [result] = await connection.execute<ResultSetHeader>(`
+        UPDATE categories 
+        SET category_status = ?, updated_at = NOW()
+        WHERE id = ? AND category_status != 'deleted'
+      `, [category_status, id]);
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          success: false,
+          error: '카테고리를 찾을 수 없습니다.'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: `카테고리 상태가 ${category_status}로 변경되었습니다.`
+      });
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Error toggling category status:', error);
+    res.status(500).json({
+      success: false,
+      error: '카테고리 상태 변경 중 오류가 발생했습니다.'
+    });
+  }
+});
+
 // 카테고리 삭제
 router.delete('/:id', async (req, res) => {
   try {
