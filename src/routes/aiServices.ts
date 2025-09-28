@@ -198,27 +198,71 @@ router.get('/search', async (req, res) => {
       const axios = require('axios');
       const webhookResponse = await axios.get(webhookUrl, {
         params: {
-          message: query
+          user_query: query
         },
         headers: {
           'Accept': 'application/json',
           'User-Agent': 'stepai-search-api/1.0'
         },
-        timeout: 10000 // 10초 타임아웃
+        timeout: 30000 // 30초 타임아웃
       });
       
       console.log('웹훅 검색 성공:', {
         status: webhookResponse.status,
         query: query,
         url: webhookUrl,
-        dataType: typeof webhookResponse.data,
-        dataLength: webhookResponse.data ? (Array.isArray(webhookResponse.data) ? webhookResponse.data.length : 'not array') : 'no data'
+        hasAnswer: !!webhookResponse.data?.search_answer,
+        serviceCount: webhookResponse.data?.search_result_id_list?.length || 0,
+        videoCount: webhookResponse.data?.search_video_id_list?.length || 0
       });
       
-      // 웹훅에서 받은 결과를 그대로 리턴
+      const webhookData = webhookResponse.data;
+      const result = {
+        search_answer: webhookData?.search_answer || '',
+        ai_services: [],
+        videos: []
+      };
+      
+      const pool = getDatabaseConnection();
+      const connection = await pool.getConnection();
+      
+      try {
+        // AI 서비스 조회
+        if (webhookData?.search_result_id_list?.length > 0) {
+          const serviceIds = webhookData.search_result_id_list.slice(0, 20); // 최대 20개
+          const placeholders = serviceIds.map(() => '?').join(',');
+          
+          const [services] = await connection.execute<RowDataPacket[]>(
+            `SELECT id, ai_name, COALESCE(ai_name_en, '') as ai_name_en, ai_description, ai_logo, company_name, is_step_pick
+             FROM ai_services 
+             WHERE id IN (${placeholders}) AND deleted_at IS NULL AND ai_status = 'active'
+             ORDER BY FIELD(id, ${placeholders})`,
+            [...serviceIds, ...serviceIds]
+          );
+          result.ai_services = services;
+        }
+        
+        // 비디오 조회
+        if (webhookData?.search_video_id_list?.length > 0) {
+          const videoIds = webhookData.search_video_id_list.slice(0, 10); // 최대 10개
+          const placeholders = videoIds.map(() => '?').join(',');
+          
+          const [videos] = await connection.execute<RowDataPacket[]>(
+            `SELECT id, video_title, video_description, thumbnail_url, video_duration, view_count, video_url
+             FROM ai_videos 
+             WHERE id IN (${placeholders}) AND video_status = 'active'
+             ORDER BY FIELD(id, ${placeholders})`,
+            [...videoIds, ...videoIds]
+          );
+          result.videos = videos;
+        }
+      } finally {
+        connection.release();
+      }
+      
       res.json({
         success: true,
-        data: webhookResponse.data || [],
+        data: result,
         source: 'webhook'
       });
       
@@ -240,11 +284,11 @@ router.get('/search', async (req, res) => {
         const [services] = await connection.execute<RowDataPacket[]>(
           `SELECT id, ai_name, ai_name_en, ai_logo, company_name 
            FROM ai_services 
-           WHERE (ai_name LIKE ? OR ai_name_en LIKE ? OR company_name LIKE ?) 
+           WHERE (ai_name LIKE ? OR ai_name_en LIKE ? OR company_name LIKE ? OR ai_description LIKE ?) 
            AND deleted_at IS NULL AND ai_status = 'active'
            ORDER BY ai_name
            LIMIT 20`,
-          [`%${query}%`, `%${query}%`, `%${query}%`]
+          [`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`]
         );
         
         res.json({ 

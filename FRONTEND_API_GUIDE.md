@@ -440,11 +440,59 @@ GET /api/ai-videos/{id}
 
 ## 🔍 검색 API
 
-### 1. AI 서비스 검색
+### 1. AI 서비스 검색 (웹훅 연동)
 ```http
-GET /api/ai-services/search?q=chatgpt
+GET /api/ai-services/search?q=검색어
 ```
-**설명**: AI 서비스명과 설명에서 검색어 검색
+**설명**: 웹훅을 통한 AI 기반 검색 서비스. 검색어를 분석하여 관련 AI 서비스와 영상을 추천하고 AI 답변을 제공합니다.
+
+**Query Parameters**:
+- `q`: 검색어 (필수)
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "search_answer": "패션 분야의 비주얼 작업을 도와줄 AI 도구를 찾고 계시는군요. 캐릭터닷AI는 대화형 엔터테인먼트 AI 챗 플랫폼으로...",
+    "ai_services": [
+      {
+        "id": 194,
+        "ai_name": "슈퍼로이어",
+        "ai_name_en": "Super Lawyer",
+        "ai_description": "AI 기반 법률 서비스",
+        "ai_logo": "/uploads/icons/super-lawyer.png",
+        "company_name": "(주)로앤컴퍼니",
+        "is_step_pick": false
+      }
+    ],
+    "videos": [
+      {
+        "id": 1,
+        "video_title": "AI 도구 활용법",
+        "video_description": "실무에서 활용하는 AI 도구들",
+        "thumbnail_url": "https://img.youtube.com/vi/.../maxresdefault.jpg",
+        "video_duration": "10:30",
+        "view_count": 1500,
+        "video_url": "https://youtube.com/watch?v=..."
+      }
+    ]
+  },
+  "source": "webhook"
+}
+```
+
+**필드 설명**:
+- `search_answer`: AI가 생성한 검색 결과에 대한 설명 및 추천 답변
+- `ai_services`: 검색어와 관련된 AI 서비스 목록 (최대 20개)
+- `videos`: 검색어와 관련된 영상 목록 (최대 10개)
+- `source`: 응답 소스 ("webhook" 또는 "fallback")
+
+**동작 방식**:
+1. 웹훅 URL로 `user_query` 파라미터와 함께 GET 요청
+2. 웹훅에서 `search_result_id_list`와 `search_video_id_list` 반환
+3. 해당 ID들로 DB에서 상세 정보 조회하여 응답
+4. 웹훅 실패 시 기존 DB 검색으로 폴백
 
 ### 2. 통합 검색 (향후 구현)
 ```http
