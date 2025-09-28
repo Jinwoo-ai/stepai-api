@@ -309,6 +309,31 @@
   - **Headers**: `Authorization: Bearer {token}`
   - **Response**: `{ success: true, message: string }`
 
+- **GET** `/api/users/me`
+  - **설명**: 내 정보 조회
+  - **Headers**: `Authorization: Bearer {token}`
+  - **Response**: `{ success: true, data: UserWithSns }`
+
+- **PUT** `/api/users/me`
+  - **설명**: 내 정보 수정
+  - **Headers**: `Authorization: Bearer {token}`
+  - **Body**: 
+    ```json
+    {
+      "name": "김철수",
+      "industry": "IT",
+      "job_role": "시니어 개발자",
+      "job_level": "과장",
+      "experience_years": 5
+    }
+    ```
+  - **Response**: `{ success: true, data: UserWithSns, message: string }`
+
+- **DELETE** `/api/users/me`
+  - **설명**: 회원탈퇴
+  - **Headers**: `Authorization: Bearer {token}`
+  - **Response**: `{ success: true, message: string }`
+
 - **GET** `/api/users/stats/overview`
   - **설명**: 회원 통계 조회
   - **Headers**: `Authorization: Bearer {token}`
@@ -390,6 +415,74 @@
       }
     }
     ```
+
+## 📎 파일 업로드 API
+- **POST** `/api/upload/single`
+  - **설명**: 단일 파일 업로드
+  - **Content-Type**: `multipart/form-data`
+  - **Body**: `file` (FormData)
+  - **Response**: 
+    ```json
+    {
+      "success": true,
+      "data": {
+        "filename": "1640995200000_proposal.pdf",
+        "originalName": "proposal.pdf",
+        "size": 2048576,
+        "url": "/uploads/attachments/1640995200000_proposal.pdf",
+        "type": "application/pdf"
+      }
+    }
+    ```
+
+- **POST** `/api/upload/multiple`
+  - **설명**: 다중 파일 업로드 (최대 5개)
+  - **Content-Type**: `multipart/form-data`
+  - **Body**: `files[]` (FormData)
+  - **Response**: `{ success: true, data: FileInfo[], message: string }`
+
+- **DELETE** `/api/upload/{filename}`
+  - **설명**: 업로드된 파일 삭제
+  - **Response**: `{ success: true, message: string }`
+
+## 📞 고객문의 API
+- **POST** `/api/inquiries`
+  - **설명**: 고객문의 등록
+  - **Body**: 
+    ```json
+    {
+      "name": "김철수",
+      "email": "kim@example.com",
+      "phone": "010-1234-5678",
+      "inquiry_type": "general",
+      "subject": "서비스 이용 문의",
+      "message": "서비스 이용 방법에 대해 문의드립니다.",
+      "attachment_url": "/uploads/attachments/1640995200000_screenshot.png"
+    }
+    ```
+  - **Response**: `{ success: true, data: Inquiry, message: string }`
+
+- **GET** `/api/inquiries`
+  - **설명**: 고객문의 목록 조회 (관리자용)
+  - **Query Parameters**: `page`, `limit`, `inquiry_type`, `inquiry_status`, `date_from`, `date_to`
+  - **Response**: `{ success: true, data: { data: Inquiry[], pagination: PaginationInfo } }`
+
+- **GET** `/api/inquiries/{id}`
+  - **설명**: 고객문의 상세 조회
+  - **Response**: `{ success: true, data: Inquiry }`
+
+- **PUT** `/api/inquiries/{id}`
+  - **설명**: 고객문의 수정 (관리자용)
+  - **Body**: 고객문의 수정 정보
+  - **Response**: `{ success: true, data: Inquiry, message: string }`
+
+- **DELETE** `/api/inquiries/{id}`
+  - **설명**: 고객문의 삭제 (관리자용)
+  - **Response**: `{ success: true, message: string }`
+
+- **GET** `/api/inquiries/stats/status`
+  - **설명**: 고객문의 상태별 통계
+  - **Response**: `{ success: true, data: Record<string, number> }`
 
 ## 🏥 헬스체크 API
 - **GET** `/health`
@@ -573,5 +666,35 @@ interface AdPartnership {
   response_date?: string;
   created_at: string;
   updated_at: string;
+}
+```
+
+### Inquiry 객체
+```typescript
+interface Inquiry {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  inquiry_type: 'general' | 'technical' | 'partnership' | 'bug_report' | 'feature_request';
+  subject: string;
+  message: string;
+  attachment_url?: string;
+  inquiry_status: 'pending' | 'in_progress' | 'resolved' | 'closed';
+  admin_notes?: string;
+  response_date?: string;
+  created_at: string;
+  updated_at: string;
+}
+```
+
+### FileUpload 객체
+```typescript
+interface FileInfo {
+  filename: string;
+  originalName: string;
+  size: number;
+  url: string;
+  type: string;
 }
 ```

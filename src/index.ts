@@ -25,6 +25,8 @@ import adPartnershipsRouter from './routes/adPartnerships';
 import setupDbRouter from './routes/setup-db';
 import myPicksRouter from './routes/myPicks';
 import setupMyPicksRouter from './routes/setup-my-picks';
+import uploadRouter from './routes/upload';
+import inquiriesRouter from './routes/inquiries';
 
 const app = express();
 const PORT = parseInt(process.env['PORT'] || '3004');
@@ -53,7 +55,7 @@ app.use((req, res, next) => {
 // 정적 파일 서빙
 app.use('/assets', express.static(path.join(__dirname, '../public/assets')));
 app.use('/public', express.static(path.join(__dirname, '../public')));
-app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Swagger 설정
 const swaggerOptions = {
@@ -297,6 +299,8 @@ app.use('/api/ad-partnerships', adPartnershipsRouter);
 app.use('/api/setup-db', setupDbRouter);
 app.use('/api/my-picks', myPicksRouter);
 app.use('/api/setup', setupMyPicksRouter);
+app.use('/api/upload', uploadRouter);
+app.use('/api/inquiries', inquiriesRouter);
 
 // 헬스체크 엔드포인트
 app.get('/health', async (_req, res) => {

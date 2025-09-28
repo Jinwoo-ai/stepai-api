@@ -1,48 +1,41 @@
 import mysql from 'mysql2/promise';
 import { dbConfig } from '../configs/database';
 import { 
-  AdPartnership, 
-  AdPartnershipCreateRequest, 
-  AdPartnershipUpdateRequest, 
-  AdPartnershipFilters,
+  Inquiry, 
+  InquiryCreateRequest, 
+  InquiryUpdateRequest, 
+  InquiryFilters,
   PaginatedResponse,
   PaginationParams 
 } from '../types/database';
 
-export class AdPartnershipService {
+export class InquiryService {
   private async getConnection() {
     return await mysql.createConnection(dbConfig);
   }
 
-  // 광고제휴 문의 생성
-  async create(data: AdPartnershipCreateRequest): Promise<AdPartnership> {
+  // 고객문의 생성
+  async create(data: InquiryCreateRequest): Promise<Inquiry> {
     const connection = await this.getConnection();
     try {
       // undefined 값들을 null로 변환
       const cleanData = {
-        company_name: data.company_name || '',
-        contact_person: data.contact_person || '',
-        contact_email: data.contact_email || '',
-        contact_phone: data.contact_phone || null,
-        partnership_type: data.partnership_type || 'advertisement',
-        budget_range: data.budget_range === 'Not specified' ? null : data.budget_range,
-        campaign_period: data.campaign_period === 'Not specified' ? null : data.campaign_period,
-        target_audience: data.target_audience === 'Not specified' ? null : data.target_audience,
-        campaign_description: data.campaign_description || null,
-        additional_requirements: data.additional_requirements || null,
+        name: data.name || '',
+        email: data.email || '',
+        phone: data.phone || null,
+        inquiry_type: data.inquiry_type || 'general',
+        subject: data.subject || '',
+        message: data.message || '',
         attachment_url: data.attachment_url === '$undefined' ? null : data.attachment_url
       };
 
       const [result] = await connection.execute(
-        `INSERT INTO ad_partnerships (
-          company_name, contact_person, contact_email, contact_phone,
-          partnership_type, budget_range, campaign_period, target_audience,
-          campaign_description, additional_requirements, attachment_url
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO inquiries (
+          name, email, phone, inquiry_type, subject, message, attachment_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
-          cleanData.company_name, cleanData.contact_person, cleanData.contact_email, cleanData.contact_phone,
-          cleanData.partnership_type, cleanData.budget_range, cleanData.campaign_period, cleanData.target_audience,
-          cleanData.campaign_description, cleanData.additional_requirements, cleanData.attachment_url
+          cleanData.name, cleanData.email, cleanData.phone, cleanData.inquiry_type,
+          cleanData.subject, cleanData.message, cleanData.attachment_url
         ]
       );
 
@@ -53,39 +46,39 @@ export class AdPartnershipService {
     }
   }
 
-  // ID로 광고제휴 조회
-  async getById(id: number): Promise<AdPartnership> {
+  // ID로 고객문의 조회
+  async getById(id: number): Promise<Inquiry> {
     const connection = await this.getConnection();
     try {
       const [rows] = await connection.execute(
-        'SELECT * FROM ad_partnerships WHERE id = ?',
+        'SELECT * FROM inquiries WHERE id = ?',
         [id]
       );
       
-      const partnerships = rows as AdPartnership[];
-      if (partnerships.length === 0) {
-        throw new Error('광고제휴 문의를 찾을 수 없습니다.');
+      const inquiries = rows as Inquiry[];
+      if (inquiries.length === 0) {
+        throw new Error('고객문의를 찾을 수 없습니다.');
       }
       
-      return partnerships[0];
+      return inquiries[0];
     } finally {
       await connection.end();
     }
   }
 
-  // 광고제휴 목록 조회 (페이지네이션)
+  // 고객문의 목록 조회 (페이지네이션)
   async getList(
     pagination: PaginationParams,
-    filters: AdPartnershipFilters = {}
-  ): Promise<PaginatedResponse<AdPartnership>> {
+    filters: InquiryFilters = {}
+  ): Promise<PaginatedResponse<Inquiry>> {
     const connection = await this.getConnection();
     try {
       let whereClause = 'WHERE 1=1';
       const params: any[] = [];
 
-      if (filters.partnership_type) {
-        whereClause += ' AND partnership_type = ?';
-        params.push(filters.partnership_type);
+      if (filters.inquiry_type) {
+        whereClause += ' AND inquiry_type = ?';
+        params.push(filters.inquiry_type);
       }
 
       if (filters.inquiry_status) {
@@ -105,7 +98,7 @@ export class AdPartnershipService {
 
       // 총 개수 조회
       const [countRows] = await connection.execute(
-        `SELECT COUNT(*) as total FROM ad_partnerships ${whereClause}`,
+        `SELECT COUNT(*) as total FROM inquiries ${whereClause}`,
         params
       );
       const total = (countRows as any)[0].total;
@@ -113,14 +106,14 @@ export class AdPartnershipService {
       // 데이터 조회
       const offset = (pagination.page - 1) * pagination.limit;
       const [rows] = await connection.execute(
-        `SELECT * FROM ad_partnerships ${whereClause} 
+        `SELECT * FROM inquiries ${whereClause} 
          ORDER BY created_at DESC 
          LIMIT ? OFFSET ?`,
         [...params, pagination.limit, offset]
       );
 
       return {
-        data: rows as AdPartnership[],
+        data: rows as Inquiry[],
         pagination: {
           page: pagination.page,
           limit: pagination.limit,
@@ -133,8 +126,8 @@ export class AdPartnershipService {
     }
   }
 
-  // 광고제휴 수정
-  async update(id: number, data: AdPartnershipUpdateRequest): Promise<AdPartnership> {
+  // 고객문의 수정
+  async update(id: number, data: InquiryUpdateRequest): Promise<Inquiry> {
     const connection = await this.getConnection();
     try {
       const updateFields: string[] = [];
@@ -159,7 +152,7 @@ export class AdPartnershipService {
       params.push(id);
 
       await connection.execute(
-        `UPDATE ad_partnerships SET ${updateFields.join(', ')} WHERE id = ?`,
+        `UPDATE inquiries SET ${updateFields.join(', ')} WHERE id = ?`,
         params
       );
 
@@ -169,17 +162,17 @@ export class AdPartnershipService {
     }
   }
 
-  // 광고제휴 삭제
+  // 고객문의 삭제
   async delete(id: number): Promise<void> {
     const connection = await this.getConnection();
     try {
       const [result] = await connection.execute(
-        'DELETE FROM ad_partnerships WHERE id = ?',
+        'DELETE FROM inquiries WHERE id = ?',
         [id]
       );
 
       if ((result as any).affectedRows === 0) {
-        throw new Error('광고제휴 문의를 찾을 수 없습니다.');
+        throw new Error('고객문의를 찾을 수 없습니다.');
       }
     } finally {
       await connection.end();
@@ -192,7 +185,7 @@ export class AdPartnershipService {
     try {
       const [rows] = await connection.execute(
         `SELECT inquiry_status, COUNT(*) as count 
-         FROM ad_partnerships 
+         FROM inquiries 
          GROUP BY inquiry_status`
       );
 
@@ -208,4 +201,4 @@ export class AdPartnershipService {
   }
 }
 
-export const adPartnershipService = new AdPartnershipService();
+export const inquiryService = new InquiryService();

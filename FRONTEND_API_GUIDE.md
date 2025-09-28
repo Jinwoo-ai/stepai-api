@@ -875,6 +875,25 @@ Authorization: Bearer {access_token}
 }
 ```
 
+### 5. 회원탈퇴
+```http
+DELETE /api/users/me
+```
+**설명**: 현재 로그인한 사용자의 계정 탈퇴
+
+**Headers**:
+```
+Authorization: Bearer {access_token}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "회원탈퇴가 성공적으로 처리되었습니다."
+}
+```
+
 ## 🤝 광고제휴 API
 
 ### 1. 광고제휴 문의 등록
@@ -932,6 +951,153 @@ GET /api/ad-partnerships/{id}
     "contact_email": "kim@samsung.com",
     "partnership_type": "banner",
     "inquiry_status": "reviewing",
+    "admin_notes": "검토 중입니다.",
+    "response_date": "2024-01-16T14:30:00Z",
+    "created_at": "2024-01-15T10:00:00Z"
+  }
+}
+```
+
+## 📎 파일 업로드 API
+
+### 1. 단일 파일 업로드
+```http
+POST /api/upload/single
+```
+**설명**: 단일 파일 업로드 (광고제휴, 고객문의 첨부파일용)
+
+**Request**: multipart/form-data
+- `file`: 업로드할 파일
+
+**허용 파일 형식**:
+- 이미지: JPEG, PNG, GIF, WebP
+- 문서: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT
+- 압축파일: ZIP
+- 최대 크기: 10MB
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "filename": "1640995200000_proposal.pdf",
+    "originalName": "proposal.pdf",
+    "size": 2048576,
+    "url": "/uploads/attachments/1640995200000_proposal.pdf",
+    "type": "application/pdf"
+  }
+}
+```
+
+### 2. 다중 파일 업로드
+```http
+POST /api/upload/multiple
+```
+**설명**: 다중 파일 업로드 (최대 5개)
+
+**Request**: multipart/form-data
+- `files[]`: 업로드할 파일들
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "filename": "1640995200000_file1.pdf",
+      "originalName": "file1.pdf",
+      "size": 1024576,
+      "url": "/uploads/attachments/1640995200000_file1.pdf",
+      "type": "application/pdf"
+    },
+    {
+      "filename": "1640995201000_file2.jpg",
+      "originalName": "file2.jpg",
+      "size": 512000,
+      "url": "/uploads/attachments/1640995201000_file2.jpg",
+      "type": "image/jpeg"
+    }
+  ],
+  "message": "2개의 파일이 성공적으로 업로드되었습니다."
+}
+```
+
+### 3. 파일 삭제
+```http
+DELETE /api/upload/{filename}
+```
+**설명**: 업로드된 파일 삭제
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "파일이 성공적으로 삭제되었습니다."
+}
+```
+
+## 📞 고객문의 API
+
+### 1. 고객문의 등록
+```http
+POST /api/inquiries
+```
+**설명**: 고객문의 등록 (공개 API)
+
+**Request Body**:
+```json
+{
+  "name": "김철수",
+  "email": "kim@example.com",
+  "phone": "010-1234-5678",
+  "inquiry_type": "general",
+  "subject": "서비스 이용 문의",
+  "message": "서비스 이용 방법에 대해 문의드립니다.",
+  "attachment_url": "/uploads/attachments/1640995200000_screenshot.png"
+}
+```
+
+**inquiry_type 옵션**:
+- `general`: 일반 문의
+- `technical`: 기술 문의
+- `partnership`: 제휴 문의
+- `bug_report`: 버그 신고
+- `feature_request`: 기능 요청
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "김철수",
+    "email": "kim@example.com",
+    "inquiry_type": "general",
+    "subject": "서비스 이용 문의",
+    "inquiry_status": "pending",
+    "created_at": "2024-01-15T10:00:00Z"
+  },
+  "message": "고객문의가 성공적으로 등록되었습니다."
+}
+```
+
+### 2. 고객문의 상태 조회
+```http
+GET /api/inquiries/{id}
+```
+**설명**: 고객문의 상세 정보 조회
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "김철수",
+    "email": "kim@example.com",
+    "inquiry_type": "general",
+    "subject": "서비스 이용 문의",
+    "inquiry_status": "in_progress",
     "admin_notes": "검토 중입니다.",
     "response_date": "2024-01-16T14:30:00Z",
     "created_at": "2024-01-15T10:00:00Z"
@@ -1307,6 +1473,51 @@ GET /api/setup/check-tables
       "pricing_info": "유료, 무료",
       "difficulty_level": "초급",
       "is_step_pick": 0
+    }
+  ]
+}
+```
+
+## 📚 큐레이션 API
+
+### 1. 큐레이션별 AI 서비스 조회
+
+```http
+GET /api/curations/{curationId}/services
+```
+**설명**: 특정 큐레이션에 포함된 AI 서비스 목록 조회
+
+**Path Parameters**:
+- `curationId`: 큐레이션 ID
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 73,
+      "ai_service_id": 1,
+      "service_order": 1,
+      "ai_name": "ChatGPT",
+      "ai_description": "OpenAI의 대화형 인공지능 챗봇 서비스",
+      "ai_logo": "https://stepai-admin-production.up.railway.app/uploads/icons/00001_ChatGPT.png",
+      "company_name": "오픈AI",
+      "pricing_info": "유료, 무료",
+      "difficulty_level": "초급",
+      "is_step_pick": 1
+    },
+    {
+      "id": 74,
+      "ai_service_id": 39,
+      "service_order": 2,
+      "ai_name": "ChatPDF",
+      "ai_description": "AI 기반 PDF 챗봇 서비스",
+      "ai_logo": "https://stepai-admin-production.up.railway.app/uploads/icons/00039_ChatPDF.png",
+      "company_name": "챗피디에프 GmbH",
+      "pricing_info": "유료, 무료",
+      "difficulty_level": "초급",
+      "is_step_pick": 1
     }
   ]
 }

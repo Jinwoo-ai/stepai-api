@@ -229,6 +229,36 @@ export class UserService {
     }
   }
 
+  // 회원탈퇴 (본인 계정)
+  async withdraw(userId: number): Promise<void> {
+    const connection = await this.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 사용자 정보 소프트 삭제
+      await connection.execute(
+        'UPDATE users SET user_status = "deleted", deleted_at = NOW() WHERE id = ?',
+        [userId]
+      );
+
+      // 모든 액세스 토큰 삭제
+      await connection.execute(
+        'DELETE FROM access_tokens WHERE user_id = ?',
+        [userId]
+      );
+
+      // 사용자 관련 데이터는 유지 (리뷰, 즐겨찾기 등)
+      // 필요시 추가 정리 작업 수행
+
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      await connection.end();
+    }
+  }
+
   // 토큰 무효화 (로그아웃)
   async logout(token: string): Promise<void> {
     const connection = await this.getConnection();

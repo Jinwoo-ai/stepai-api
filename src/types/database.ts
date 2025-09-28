@@ -574,3 +574,50 @@ export interface SnsLoginRequest {
   job_level?: string;
   experience_years?: number;
 }
+
+// 고객문의 관련 타입들
+export interface Inquiry {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  inquiry_type: 'general' | 'technical' | 'partnership' | 'bug_report' | 'feature_request';
+  subject: string;
+  message: string;
+  attachment_url?: string;
+  inquiry_status: 'pending' | 'in_progress' | 'resolved' | 'closed';
+  admin_notes?: string;
+  response_date?: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface InquiryCreateRequest {
+  name: string;
+  email: string;
+  phone?: string;
+  inquiry_type: 'general' | 'technical' | 'partnership' | 'bug_report' | 'feature_request';
+  subject: string;
+  message: string;
+  attachment_url?: string;
+}
+
+export interface InquiryUpdateRequest {
+  name?: string;
+  email?: string;
+  phone?: string;
+  inquiry_type?: 'general' | 'technical' | 'partnership' | 'bug_report' | 'feature_request';
+  subject?: string;
+  message?: string;
+  attachment_url?: string;
+  inquiry_status?: 'pending' | 'in_progress' | 'resolved' | 'closed';
+  admin_notes?: string;
+  response_date?: Date;
+}
+
+export interface InquiryFilters {
+  inquiry_type?: string;
+  inquiry_status?: string;
+  date_from?: Date;
+  date_to?: Date;
+}
