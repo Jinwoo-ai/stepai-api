@@ -233,13 +233,30 @@ router.get('/search', async (req, res) => {
           const placeholders = serviceIds.map(() => '?').join(',');
           
           const [services] = await connection.execute<RowDataPacket[]>(
-            `SELECT id, ai_name, COALESCE(ai_name_en, '') as ai_name_en, ai_description, ai_logo, company_name, is_step_pick
-             FROM ai_services 
-             WHERE id IN (${placeholders}) AND deleted_at IS NULL AND ai_status = 'active'
-             ORDER BY FIELD(id, ${placeholders})`,
+            `SELECT s.id, s.ai_name, COALESCE(s.ai_name_en, '') as ai_name_en, s.ai_description, s.ai_logo, s.company_name, s.is_step_pick, s.is_new,
+                    c.id as category_id, c.category_name
+             FROM ai_services s
+             LEFT JOIN ai_service_categories asc ON s.id = asc.ai_service_id AND asc.is_main_category = 1
+             LEFT JOIN categories c ON asc.category_id = c.id
+             WHERE s.id IN (${placeholders}) AND s.deleted_at IS NULL AND s.ai_status = 'active'
+             ORDER BY FIELD(s.id, ${placeholders})`,
             [...serviceIds, ...serviceIds]
           );
-          result.ai_services = services;
+          
+          result.ai_services = services.map(service => ({
+            id: service.id,
+            ai_name: service.ai_name,
+            ai_name_en: service.ai_name_en,
+            ai_description: service.ai_description,
+            ai_logo: service.ai_logo,
+            company_name: service.company_name,
+            is_step_pick: service.is_step_pick,
+            is_new: service.is_new,
+            category: service.category_id ? {
+              id: service.category_id,
+              category_name: service.category_name
+            } : null
+          }));
         }
         
         // 비디오 조회
@@ -282,18 +299,51 @@ router.get('/search', async (req, res) => {
       
       try {
         const [services] = await connection.execute<RowDataPacket[]>(
-          `SELECT id, ai_name, ai_name_en, ai_logo, company_name 
-           FROM ai_services 
-           WHERE (ai_name LIKE ? OR ai_name_en LIKE ? OR company_name LIKE ? OR ai_description LIKE ?) 
-           AND deleted_at IS NULL AND ai_status = 'active'
-           ORDER BY ai_name
+          `SELECT s.id, s.ai_name, COALESCE(s.ai_name_en, '') as ai_name_en, s.ai_description, s.ai_logo, s.company_name, s.is_step_pick, s.is_new,
+                  c.id as category_id, c.category_name
+           FROM ai_services s
+           LEFT JOIN ai_service_categories asc ON s.id = asc.ai_service_id AND asc.is_main_category = 1
+           LEFT JOIN categories c ON asc.category_id = c.id
+           WHERE (s.ai_name LIKE ? OR s.ai_name_en LIKE ? OR s.company_name LIKE ? OR s.ai_description LIKE ?) 
+           AND s.deleted_at IS NULL AND s.ai_status = 'active'
+           ORDER BY s.ai_name
            LIMIT 20`,
           [`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`]
         );
         
+        // 비디오 검색
+        const [videos] = await connection.execute<RowDataPacket[]>(
+          `SELECT id, video_title, video_description, thumbnail_url, video_duration, view_count, video_url
+           FROM ai_videos 
+           WHERE (video_title LIKE ? OR video_description LIKE ?) 
+           AND video_status = 'active'
+           ORDER BY view_count DESC
+           LIMIT 10`,
+          [`%${query}%`, `%${query}%`]
+        );
+        
+        const fallbackResult = {
+          search_answer: `"${query}"에 대한 검색 결과입니다.`,
+          ai_services: services.map(service => ({
+            id: service.id,
+            ai_name: service.ai_name,
+            ai_name_en: service.ai_name_en,
+            ai_description: service.ai_description,
+            ai_logo: service.ai_logo,
+            company_name: service.company_name,
+            is_step_pick: service.is_step_pick,
+            is_new: service.is_new,
+            category: service.category_id ? {
+              id: service.category_id,
+              category_name: service.category_name
+            } : null
+          })),
+          videos: videos
+        };
+        
         res.json({ 
           success: true, 
-          data: services,
+          data: fallbackResult,
           source: 'fallback'
         });
       } finally {
@@ -448,6 +498,7 @@ router.get('/', async (req, res) => {
   const category_id = req.query['category_id'] ? parseInt(req.query['category_id'] as string) : undefined;
   const ai_status = req.query['ai_status'] as string;
   const is_step_pick = req.query['is_step_pick'] as string;
+  const is_new = req.query['is_new'] as string;
   const include_categories = req.query['include_categories'] === 'true';
   
   try {
@@ -478,6 +529,11 @@ router.get('/', async (req, res) => {
       if (is_step_pick) {
         whereConditions.push('ai_services.is_step_pick = ?');
         queryParams.push(is_step_pick === 'true');
+      }
+
+      if (is_new) {
+        whereConditions.push('ai_services.is_new = ?');
+        queryParams.push(is_new === 'true');
       }
 
       const whereClause = whereConditions.join(' AND ');
@@ -997,7 +1053,7 @@ router.post('/', async (req, res) => {
         ai_name, ai_name_en, ai_description, ai_website, ai_logo,
         company_name, company_name_en, embedded_video_url, headquarters,
         pricing_info, difficulty_level, usage_availability,
-        nationality, is_visible, is_step_pick, categories, contents, sns,
+        nationality, is_visible, is_step_pick, is_new, categories, contents, sns,
         similar_service_ids, selected_tags, ai_type_ids, pricing_model_ids, target_type_ids
       } = req.body;
       
@@ -1007,13 +1063,13 @@ router.post('/', async (req, res) => {
           ai_name, ai_name_en, ai_description, ai_website, ai_logo,
           company_name, company_name_en, embedded_video_url, headquarters,
           pricing_info, difficulty_level, usage_availability,
-          nationality, ai_status, is_visible, is_step_pick
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          nationality, ai_status, is_visible, is_step_pick, is_new
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           ai_name, ai_name_en, ai_description, ai_website, ai_logo,
           company_name, company_name_en, embedded_video_url, headquarters,
           pricing_info, difficulty_level, usage_availability,
-          nationality, 'active', is_visible, is_step_pick
+          nationality, 'active', is_visible, is_step_pick, is_new
         ]
       );
       
@@ -1300,32 +1356,48 @@ router.put('/:id', async (req, res) => {
         ai_name, ai_name_en, ai_description, ai_website, ai_logo,
         company_name, company_name_en, embedded_video_url, headquarters,
         pricing_info, difficulty_level, usage_availability,
-        nationality, is_visible, is_step_pick, categories, contents, sns,
+        nationality, is_visible, is_step_pick, is_new, categories, contents, sns,
         similar_service_ids, selected_tags, ai_type_ids, pricing_model_ids, target_type_ids
       } = req.body;
       
-      // AI 서비스 수정 (새로운 스키마에 맞게)
-      await connection.execute(
-        `UPDATE ai_services SET
-          ai_name = ?, ai_name_en = ?, ai_description = ?, ai_website = ?, ai_logo = ?,
-          company_name = ?, company_name_en = ?, embedded_video_url = ?, headquarters = ?,
-          pricing_info = ?, difficulty_level = ?, usage_availability = ?,
-          nationality = ?, is_visible = ?, is_step_pick = ?, updated_at = NOW()
-         WHERE id = ?`,
-        [
-          ai_name, ai_name_en, ai_description, ai_website, ai_logo,
-          company_name, company_name_en, embedded_video_url, headquarters,
-          pricing_info, difficulty_level, usage_availability,
-          nationality, is_visible, is_step_pick, id
-        ]
-      );
+      // 동적 업데이트 쿼리 생성
+      const updateFields = [];
+      const updateValues = [];
       
-      // 기존 관계 데이터 삭제
-      await connection.execute('DELETE FROM ai_service_types WHERE ai_service_id = ?', [id]);
-      await connection.execute('DELETE FROM ai_service_pricing_models WHERE ai_service_id = ?', [id]);
-      await connection.execute('DELETE FROM ai_service_target_types WHERE ai_service_id = ?', [id]);
-      await connection.execute('DELETE FROM ai_service_contents WHERE ai_service_id = ?', [id]);
-      await connection.execute('DELETE FROM ai_service_sns WHERE ai_service_id = ?', [id]);
+      Object.keys(req.body).forEach(key => {
+        if (['categories', 'contents', 'sns', 'similar_service_ids', 'selected_tags', 'ai_type_ids', 'pricing_model_ids', 'target_type_ids'].includes(key)) {
+          return; // 관계 데이터는 별도 처리
+        }
+        updateFields.push(`${key} = ?`);
+        updateValues.push(req.body[key]);
+      });
+      
+      if (updateFields.length > 0) {
+        updateFields.push('updated_at = NOW()');
+        updateValues.push(id);
+        
+        await connection.execute(
+          `UPDATE ai_services SET ${updateFields.join(', ')} WHERE id = ?`,
+          updateValues
+        );
+      }
+      
+      // 관계 데이터가 제공된 경우만 삭제
+      if (req.body.ai_type_ids !== undefined) {
+        await connection.execute('DELETE FROM ai_service_types WHERE ai_service_id = ?', [id]);
+      }
+      if (req.body.pricing_model_ids !== undefined) {
+        await connection.execute('DELETE FROM ai_service_pricing_models WHERE ai_service_id = ?', [id]);
+      }
+      if (req.body.target_type_ids !== undefined) {
+        await connection.execute('DELETE FROM ai_service_target_types WHERE ai_service_id = ?', [id]);
+      }
+      if (req.body.contents !== undefined) {
+        await connection.execute('DELETE FROM ai_service_contents WHERE ai_service_id = ?', [id]);
+      }
+      if (req.body.sns !== undefined) {
+        await connection.execute('DELETE FROM ai_service_sns WHERE ai_service_id = ?', [id]);
+      }
       
       // AI 타입 처리
       if (ai_type_ids && Array.isArray(ai_type_ids)) {
@@ -1381,11 +1453,13 @@ router.put('/:id', async (req, res) => {
         }
       }
       
-      // 기존 유사 서비스 관계 삭제
-      await connection.execute(
-        'DELETE FROM ai_service_similar_services WHERE ai_service_id = ? OR similar_service_id = ?',
-        [id, id]
-      );
+      // 유사 서비스 처리
+      if (req.body.similar_service_ids !== undefined) {
+        await connection.execute(
+          'DELETE FROM ai_service_similar_services WHERE ai_service_id = ? OR similar_service_id = ?',
+          [id, id]
+        );
+      }
       
       // 새 유사 서비스 관계 추가
       if (similar_service_ids && Array.isArray(similar_service_ids)) {
@@ -1401,8 +1475,10 @@ router.put('/:id', async (req, res) => {
         }
       }
       
-      // 기존 태그 관계 삭제 및 새 태그 추가
-      await connection.execute('DELETE FROM ai_service_tags WHERE ai_service_id = ?', [id]);
+      // 태그 처리
+      if (req.body.selected_tags !== undefined) {
+        await connection.execute('DELETE FROM ai_service_tags WHERE ai_service_id = ?', [id]);
+      }
       if (selected_tags && Array.isArray(selected_tags)) {
         for (const tagId of selected_tags) {
           await connection.execute(
@@ -1412,8 +1488,10 @@ router.put('/:id', async (req, res) => {
         }
       }
       
-      // 기존 카테고리 관계 삭제 및 새 카테고리 추가
-      await connection.execute('DELETE FROM ai_service_categories WHERE ai_service_id = ?', [id]);
+      // 카테고리 처리
+      if (req.body.categories !== undefined) {
+        await connection.execute('DELETE FROM ai_service_categories WHERE ai_service_id = ?', [id]);
+      }
       if (categories && Array.isArray(categories)) {
         for (const category of categories) {
           await connection.execute(

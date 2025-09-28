@@ -22,7 +22,8 @@ router.get('/services', async (req, res) => {
         ais.ai_description,
         ais.ai_logo,
         ais.company_name,
-        ais.is_step_pick
+        ais.is_step_pick,
+        ais.is_new
       FROM user_favorite_services ufs
       JOIN ai_services ais ON ufs.ai_service_id = ais.id
       WHERE ufs.user_id = ? AND ais.ai_status = 'active'

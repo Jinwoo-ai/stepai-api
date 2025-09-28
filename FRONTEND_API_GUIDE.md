@@ -284,7 +284,7 @@ GET /api/homepage-settings/trends/{sectionId}/services
 ```
 
 **필드 설명**:
-- `is_new`: 생성일자가 한달 이내인 경우 `true`
+- `is_new`: 관리자가 설정한 신규 서비스 표시 여부 (`true`/`false`)
 - `tags`: AI 서비스에 연결된 태그 목록 (배열)
 - `is_bookmarked`: 로그인된 사용자의 경우만 포함, `user_favorites` 테이블 기반
 
@@ -463,7 +463,14 @@ GET /api/ai-services/search?q=검색어
         "ai_description": "AI 기반 법률 서비스",
         "ai_logo": "/uploads/icons/super-lawyer.png",
         "company_name": "(주)로앤컴퍼니",
-        "is_step_pick": false
+        "is_step_pick": false,
+        "is_new": false,
+        "categories": [
+          {
+            "id": 1,
+            "category_name": "법률·전문서비스"
+          }
+        ]
       }
     ],
     "videos": [
@@ -550,7 +557,8 @@ GET /api/my-picks/services
       "ai_description": "OpenAI의 대화형 AI 모델",
       "ai_logo": "/uploads/icons/chatgpt.png",
       "company_name": "OpenAI",
-      "is_step_pick": true
+      "is_step_pick": true,
+      "is_new": false
     }
   ]
 }

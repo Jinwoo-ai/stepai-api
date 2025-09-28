@@ -338,13 +338,14 @@ router.get('/:curationId/services', async (req, res) => {
         ais.pricing_info,
         ais.difficulty_level,
         ais.is_step_pick,
+        ais.is_new,
         GROUP_CONCAT(DISTINCT t.tag_name) as tags
       FROM curation_ai_services cas
       JOIN ai_services ais ON cas.ai_service_id = ais.id
       LEFT JOIN ai_service_tags ast ON ais.id = ast.ai_service_id
       LEFT JOIN tags t ON ast.tag_id = t.id
       WHERE cas.curation_id = ? AND ais.ai_status = 'active'
-      GROUP BY cas.id, cas.ai_service_id, cas.service_order, ais.ai_name, ais.ai_name_en, ais.ai_description, ais.ai_logo, ais.company_name, ais.pricing_info, ais.difficulty_level, ais.is_step_pick
+      GROUP BY cas.id, cas.ai_service_id, cas.service_order, ais.ai_name, ais.ai_name_en, ais.ai_description, ais.ai_logo, ais.company_name, ais.pricing_info, ais.difficulty_level, ais.is_step_pick, ais.is_new
       ORDER BY cas.service_order ASC
     `;
 

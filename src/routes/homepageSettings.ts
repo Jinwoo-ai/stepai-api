@@ -399,7 +399,7 @@ router.get('/trends/:sectionId/services', async (req, res) => {
         ais.company_name,
         ais.is_step_pick,
         ais.created_at,
-        CASE WHEN ais.created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH) THEN true ELSE false END as is_new,
+        ais.is_new,
         c.category_name,
         GROUP_CONCAT(DISTINCT t.tag_name) as tags
     `;
@@ -442,7 +442,7 @@ router.get('/trends/:sectionId/services', async (req, res) => {
     
     query += `
       GROUP BY tss.id, tss.ai_service_id, tss.category_id, tss.display_order, tss.is_featured, tss.is_active, 
-               ais.ai_name, ais.ai_description, ais.ai_logo, ais.company_name, ais.is_step_pick, ais.created_at, 
+               ais.ai_name, ais.ai_description, ais.ai_logo, ais.company_name, ais.is_step_pick, ais.is_new, 
                c.category_name`;
     
     if (userId) {
@@ -455,7 +455,7 @@ router.get('/trends/:sectionId/services', async (req, res) => {
 
     const [rows] = await pool.execute<RowDataPacket[]>(query, params);
     
-    // tags 필드를 배열로 변환하고 is_new 계산
+    // tags 필드를 배열로 변환
     const processedRows = rows.map(row => ({
       ...row,
       tags: row.tags ? row.tags.split(',') : [],
@@ -622,7 +622,8 @@ router.get('/available-services', async (req, res) => {
         ais.ai_description,
         ais.ai_logo,
         ais.company_name,
-        ais.is_step_pick
+        ais.is_step_pick,
+        ais.is_new
       FROM ai_services ais
       WHERE ais.ai_status = 'active'
     `;
