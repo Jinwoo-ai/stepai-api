@@ -359,6 +359,106 @@ router.get('/search', async (req, res) => {
   }
 });
 
+// 샘플 엑셀 파일 다운로드 (정적 파일)
+router.get('/sample-excel', async (req, res) => {
+  try {
+    const sampleData = [
+      {
+        '서비스명(국문)': 'ChatGPT',
+        '서비스명(영문)': 'ChatGPT',
+        '한줄설명': 'OpenAI의 대화형 인공지능 챗봇 서비스',
+        '대표 URL': 'https://chat.openai.com',
+        '기업명(국문)': '오픈AI',
+        '기업명(영문)': 'OpenAI',
+        '임베디드 영상 URL': '',
+        '본사': '미국',
+        '주요기능': '대화형 AI 모델로 다양한 질문에 답변 제공',
+        '타겟 사용자': '일반 사용자, 개발자, 연구자',
+        '추천활용사례': '코드 작성, 글쓰기, 번역, 요약 등',
+        'Price': '무료, 유료',
+        '난이도': '초급',
+        '사용': '웹, 모바일 앱',
+        'Alive': 'Yes',
+        '표시위치': 'STEP_PICK',
+        'NEW': 'No',
+        '형태': '웹, API',
+        'Target': 'GEN, BUS',
+        '메인 카테고리': 'AI 글쓰기',
+        '서브 카테고리': '대화형에이전트, 개인어시스턴트',
+        'Tags': '#AI글쓰기 #대화형에이전트 #개인어시스턴트'
+      },
+      {
+        '서비스명(국문)': 'Claude',
+        '서비스명(영문)': 'Claude',
+        '한줄설명': 'Anthropic의 AI 어시스턴트',
+        '대표 URL': 'https://claude.ai',
+        '기업명(국문)': '안스로픽',
+        '기업명(영문)': 'Anthropic',
+        '임베디드 영상 URL': '',
+        '본사': '미국',
+        '주요기능': '안전하고 도움이 되는 AI 어시스턴트',
+        '타겟 사용자': '전문가, 연구자, 비즈니스 사용자',
+        '추천활용사례': '문서 작성, 데이터 분석, 코드 리뷰',
+        'Price': '무료, 유료',
+        '난이도': '중급',
+        '사용': '웹',
+        'Alive': 'Yes',
+        '표시위치': '',
+        'NEW': 'Yes',
+        '형태': '웹',
+        'Target': 'PRO, BUS',
+        '메인 카테고리': 'AI 글쓰기',
+        '서브 카테고리': '블로그/아티클, 학술/전문문서',
+        'Tags': '#AI글쓰기 #블로그 #전문문서'
+      }
+    ];
+    
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    
+    const columnWidths = [
+      { wch: 20 }, // 서비스명(국문)
+      { wch: 20 }, // 서비스명(영문)
+      { wch: 40 }, // 한줄설명
+      { wch: 30 }, // 대표 URL
+      { wch: 15 }, // 기업명(국문)
+      { wch: 15 }, // 기업명(영문)
+      { wch: 30 }, // 임베디드 영상 URL
+      { wch: 10 }, // 본사
+      { wch: 30 }, // 주요기능
+      { wch: 25 }, // 타겟 사용자
+      { wch: 30 }, // 추천활용사례
+      { wch: 15 }, // Price
+      { wch: 10 }, // 난이도
+      { wch: 15 }, // 사용
+      { wch: 8 },  // Alive
+      { wch: 12 }, // 표시위치
+      { wch: 8 },  // NEW
+      { wch: 15 }, // 형태
+      { wch: 12 }, // Target
+      { wch: 20 }, // 메인 카테고리
+      { wch: 30 }, // 서브 카테고리
+      { wch: 40 }  // Tags
+    ];
+    
+    worksheet['!cols'] = columnWidths;
+    
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'AI_Services_Template');
+    
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    
+    res.setHeader('Content-Disposition', 'attachment; filename="ai_services_template.xlsx"');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buffer);
+  } catch (error) {
+    console.error('Error creating sample excel:', error);
+    res.status(500).json({
+      success: false,
+      error: '샘플 엑셀 파일 생성 중 오류가 발생했습니다.'
+    });
+  }
+});
+
 // AI 서비스 개별 조회
 router.get('/:id', async (req, res) => {
   try {
@@ -738,7 +838,168 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 엑셀 업로드 엔드포인트
+
+
+// 엑셀 다운로드 엔드포인트
+router.get('/download-excel', async (req, res) => {
+  try {
+    const pool = getDatabaseConnection();
+    const connection = await pool.getConnection();
+    
+    try {
+      const [services] = await connection.execute<RowDataPacket[]>(
+        `SELECT s.*, 
+                GROUP_CONCAT(DISTINCT at.type_name SEPARATOR ', ') as ai_types,
+                GROUP_CONCAT(DISTINCT pm.model_name SEPARATOR ', ') as pricing_models,
+                GROUP_CONCAT(DISTINCT tt.type_code SEPARATOR ', ') as target_types,
+                GROUP_CONCAT(DISTINCT c.category_name SEPARATOR ', ') as categories,
+                GROUP_CONCAT(DISTINCT t.tag_name SEPARATOR ', ') as tag_names
+         FROM ai_services s
+         LEFT JOIN ai_service_types ast ON s.id = ast.ai_service_id
+         LEFT JOIN ai_types at ON ast.ai_type_id = at.id
+         LEFT JOIN ai_service_pricing_models aspm ON s.id = aspm.ai_service_id
+         LEFT JOIN pricing_models pm ON aspm.pricing_model_id = pm.id
+         LEFT JOIN ai_service_target_types astt ON s.id = astt.ai_service_id
+         LEFT JOIN target_types tt ON astt.target_type_id = tt.id
+         LEFT JOIN ai_service_categories asc ON s.id = asc.ai_service_id
+         LEFT JOIN categories c ON asc.category_id = c.id
+         LEFT JOIN ai_service_tags ast2 ON s.id = ast2.ai_service_id
+         LEFT JOIN tags t ON ast2.tag_id = t.id
+         WHERE s.deleted_at IS NULL
+         GROUP BY s.id
+         ORDER BY s.created_at DESC`
+      );
+      
+      // 샘플 데이터 생성
+      const sampleData = [
+        {
+          '서비스명(국문)': 'ChatGPT',
+          '서비스명(영문)': 'ChatGPT',
+          '한줄설명': 'OpenAI의 대화형 인공지능 챗봇 서비스',
+          '대표 URL': 'https://chat.openai.com',
+          '로고(URL)': 'https://example.com/chatgpt-logo.png',
+          '기업명(국문)': '오픈AI',
+          '기업명(영문)': 'OpenAI',
+          '임베디드 영상 URL': '',
+          '본사': '미국',
+          '주요기능': '대화형 AI 모델로 다양한 질문에 답변 제공',
+          '타겟 사용자': '일반 사용자, 개발자, 연구자',
+          '추천활용사례': '코드 작성, 글쓰기, 번역, 요약 등',
+          'Price': '무료, 유료',
+          '난이도': '초급',
+          '사용': '웹, 모바일 앱',
+          'Alive': 'Yes',
+          '표시위치': 'STEP_PICK',
+          'NEW': 'No',
+          '형태': '웹, API',
+          'Target': 'GEN, BUS',
+          '메인 카테고리': 'AI 글쓰기',
+          '서브 카테고리': '대화형에이전트, 개인어시스턴트',
+          'Tags': '#AI글쓰기 #대화형에이전트 #개인어시스턴트'
+        },
+        {
+          '서비스명(국문)': 'Claude',
+          '서비스명(영문)': 'Claude',
+          '한줄설명': 'Anthropic의 AI 어시스턴트',
+          '대표 URL': 'https://claude.ai',
+          '로고(URL)': 'https://example.com/claude-logo.png',
+          '기업명(국문)': '안스로픽',
+          '기업명(영문)': 'Anthropic',
+          '임베디드 영상 URL': '',
+          '본사': '미국',
+          '주요기능': '안전하고 도움이 되는 AI 어시스턴트',
+          '타겟 사용자': '전문가, 연구자, 비즈니스 사용자',
+          '추천활용사례': '문서 작성, 데이터 분석, 코드 리뷰',
+          'Price': '무료, 유료',
+          '난이도': '중급',
+          '사용': '웹',
+          'Alive': 'Yes',
+          '표시위치': '',
+          'NEW': 'Yes',
+          '형태': '웹',
+          'Target': 'PRO, BUS',
+          '메인 카테고리': 'AI 글쓰기',
+          '서브 카테고리': '블로그/아티클, 학술/전문문서',
+          'Tags': '#AI글쓰기 #블로그 #전문문서'
+        }
+      ];
+      
+      const excelData = sampleData;
+      
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      
+      // 컨럼 너비 설정
+      const columnWidths = [
+        { wch: 20 }, // 서비스명(국문)
+        { wch: 20 }, // 서비스명(영문)
+        { wch: 40 }, // 한줄설명
+        { wch: 30 }, // 대표 URL
+        { wch: 30 }, // 로고(URL)
+        { wch: 15 }, // 기업명(국문)
+        { wch: 15 }, // 기업명(영문)
+        { wch: 30 }, // 임베디드 영상 URL
+        { wch: 10 }, // 본사
+        { wch: 30 }, // 주요기능
+        { wch: 25 }, // 타겟 사용자
+        { wch: 30 }, // 추천활용사례
+        { wch: 15 }, // Price
+        { wch: 10 }, // 난이도
+        { wch: 15 }, // 사용
+        { wch: 8 },  // Alive
+        { wch: 12 }, // 표시위치
+        { wch: 8 },  // NEW
+        { wch: 15 }, // 형태
+        { wch: 12 }, // Target
+        { wch: 20 }, // 메인 카테고리
+        { wch: 30 }, // 서브 카테고리
+        { wch: 40 }  // Tags
+      ];
+      
+      worksheet['!cols'] = columnWidths;
+      
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'AI_Services_Template');
+      
+      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      
+      res.setHeader('Content-Disposition', 'attachment; filename="ai_services_template.xlsx"');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.send(buffer);
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Error downloading excel:', error);
+    res.status(500).json({
+      success: false,
+      error: '엑셀 다운로드 중 오류가 발생했습니다.'
+    });
+  }
+});
+
+// 난이도 매핑 함수
+const mapDifficultyLevel = (difficulty: string): string => {
+  if (!difficulty) return 'beginner';
+  const difficultyMap: { [key: string]: string } = {
+    '초급': 'beginner',
+    '중급': 'intermediate', 
+    '고급': 'advanced'
+  };
+  return difficultyMap[difficulty.trim()] || 'beginner';
+};
+
+// 난이도 역매핑 함수 (다운로드용)
+const mapDifficultyLevelReverse = (difficulty: string): string => {
+  if (!difficulty) return '초급';
+  const difficultyMap: { [key: string]: string } = {
+    'beginner': '초급',
+    'intermediate': '중급',
+    'advanced': '고급'
+  };
+  return difficultyMap[difficulty.trim()] || '초급';
+};
+
+// 엑셀 업로드 엔드포인트 (개선된 버전)
 router.post('/upload-excel', upload.single('excel'), async (req, res) => {
   try {
     if (!req.file) {
@@ -781,17 +1042,30 @@ router.post('/upload-excel', upload.single('excel'), async (req, res) => {
             continue;
           }
 
-          // 서비스명으로 기존 서비스 확인
-          const [existingServices] = await connection.execute<RowDataPacket[]>(
-            'SELECT id FROM ai_services WHERE ai_name = ? AND deleted_at IS NULL',
-            [row['서비스명(국문)']]
-          );
+          // ai_name_en 기준으로 기존 서비스 확인 (없으면 ai_name으로 확인)
+          let existingServices = [];
+          if (row['서비스명(영문)']) {
+            const [services] = await connection.execute<RowDataPacket[]>(
+              'SELECT id FROM ai_services WHERE ai_name_en = ? AND deleted_at IS NULL',
+              [row['서비스명(영문)']]
+            );
+            existingServices = services;
+          }
+          
+          // ai_name_en으로 찾지 못했으면 ai_name으로 확인
+          if (existingServices.length === 0) {
+            const [services] = await connection.execute<RowDataPacket[]>(
+              'SELECT id FROM ai_services WHERE ai_name = ? AND deleted_at IS NULL',
+              [row['서비스명(국문)']]
+            );
+            existingServices = services;
+          }
 
           let serviceId: number;
           let isUpdate = false;
 
           if (existingServices.length > 0) {
-            // 기존 서비스 업데이트
+            // 기존 서비스 업데이트 (로고 포함)
             serviceId = existingServices[0]['id'];
             isUpdate = true;
             
@@ -801,7 +1075,7 @@ router.post('/upload-excel', upload.single('excel'), async (req, res) => {
                 company_name = ?, company_name_en = ?, embedded_video_url = ?, headquarters = ?,
                 main_features = ?, target_users = ?, use_cases = ?,
                 pricing_info = ?, difficulty_level = ?, usage_availability = ?,
-                is_visible = ?, is_step_pick = ?, updated_at = NOW()
+                is_visible = ?, is_step_pick = ?, is_new = ?, updated_at = NOW()
                WHERE id = ?`,
               [
                 row['서비스명(영문)'] || null,
@@ -816,10 +1090,11 @@ router.post('/upload-excel', upload.single('excel'), async (req, res) => {
                 row['타겟 사용자'] || null,
                 row['추천활용사례'] || null,
                 row['Price'] || null,
-                row['난이도'] || 'beginner',
+                mapDifficultyLevel(row['난이도']) || 'beginner',
                 row['사용'] || null,
                 row['Alive'] === 'Yes' || true,
                 row['표시위치'] === 'STEP_PICK' || false,
+                row['NEW'] === 'Yes' || false,
                 serviceId
               ]
             );
@@ -830,16 +1105,17 @@ router.post('/upload-excel', upload.single('excel'), async (req, res) => {
             await connection.execute('DELETE FROM ai_service_target_types WHERE ai_service_id = ?', [serviceId]);
             await connection.execute('DELETE FROM ai_service_tags WHERE ai_service_id = ?', [serviceId]);
             await connection.execute('DELETE FROM ai_service_categories WHERE ai_service_id = ?', [serviceId]);
+            await connection.execute('DELETE FROM ai_service_contents WHERE ai_service_id = ?', [serviceId]);
           } else {
-            // 새 서비스 생성
+            // 새 서비스 생성 (로고 포함)
             const [result] = await connection.execute<ResultSetHeader>(
               `INSERT INTO ai_services (
                 ai_name, ai_name_en, ai_description, ai_website, ai_logo,
                 company_name, company_name_en, embedded_video_url, headquarters,
                 main_features, target_users, use_cases,
                 pricing_info, difficulty_level, usage_availability,
-                ai_status, is_visible, is_step_pick
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                ai_status, is_visible, is_step_pick, is_new
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               [
                 row['서비스명(국문)'],
                 row['서비스명(영문)'] || null,
@@ -854,11 +1130,12 @@ router.post('/upload-excel', upload.single('excel'), async (req, res) => {
                 row['타겟 사용자'] || null,
                 row['추천활용사례'] || null,
                 row['Price'] || null,
-                row['난이도'] || 'beginner',
+                mapDifficultyLevel(row['난이도']) || 'beginner',
                 row['사용'] || null,
                 'active',
                 row['Alive'] === 'Yes' || true,
-                row['표시위치'] === 'STEP_PICK' || false
+                row['표시위치'] === 'STEP_PICK' || false,
+                row['NEW'] === 'Yes' || false
               ]
             );
             serviceId = result.insertId!;
@@ -923,7 +1200,7 @@ router.post('/upload-excel', upload.single('excel'), async (req, res) => {
             }
           }
 
-          // 메인 카테고리 처리
+          // 메인 카테고리 처리 (대표 카테고리로 설정)
           if (row['메인 카테고리']) {
             const [mainCategories] = await connection.execute<RowDataPacket[]>(
               'SELECT id FROM categories WHERE category_name = ? AND category_status = "active" AND parent_id IS NULL',
@@ -935,6 +1212,26 @@ router.post('/upload-excel', upload.single('excel'), async (req, res) => {
                 'INSERT IGNORE INTO ai_service_categories (ai_service_id, category_id, is_main_category) VALUES (?, ?, ?)',
                 [serviceId, mainCategories[0]['id'], true]
               );
+            }
+          }
+
+          // 서브 카테고리 처리 (대표 카테고리 아님)
+          if (row['서브 카테고리']) {
+            const subCategoryNames = row['서브 카테고리'].toString().split(/[,;]/).map((name: string) => name.trim()).filter((name: string) => name);
+            
+            for (const subCategoryName of subCategoryNames) {
+              // 서브 카테고리 존재 확인 (모든 카테고리에서 검색)
+              const [subCategories] = await connection.execute<RowDataPacket[]>(
+                'SELECT id FROM categories WHERE category_name = ? AND category_status = "active"',
+                [subCategoryName]
+              );
+              
+              if (subCategories.length > 0) {
+                await connection.execute(
+                  'INSERT IGNORE INTO ai_service_categories (ai_service_id, category_id, is_main_category) VALUES (?, ?, ?)',
+                  [serviceId, subCategories[0]['id'], false]
+                );
+              }
             }
           }
 
@@ -1060,7 +1357,8 @@ router.post('/upload-excel', upload.single('excel'), async (req, res) => {
           successCount,
           updateCount,
           errorCount,
-          errors: errors.slice(0, 10)
+          errors: errors.slice(0, 10),
+          description: '엑셀 업로드 시 주의사항:\n\n필드 설명:\n- 서비스명(국문): 필수 필드\n- 서비스명(영문): 중복 확인 기준\n- 로고(URL): AI 서비스 로고 이미지 URL\n- 난이도: 초급/중급/고급 입력\n- Alive: Yes/No (서비스 활성 상태)\n- 표시위치: STEP_PICK 또는 빈값 (메인페이지 STEP PICK 섹션 표시)\n- NEW: Yes/No (신규 서비스 표시 - 카드에 NEW 뱃지 표시)\n- 메인 카테고리: 대표 카테고리 1개\n- 서브 카테고리: 콤마로 구분하여 여러 개 (메인 카테고리 외 추가 분류)\n- 형태: AI 타입 (콤마로 구분)\n- Tags: #으로 시작하는 태그\n\n주의사항:\n- 로고(URL) 필드에 이미지 URL 입력 시 자동으로 ai_logo에 저장됨\n- 서비스명(영문) 기준으로 중복 확인 후 업데이트'
         }
       });
     } catch (error) {

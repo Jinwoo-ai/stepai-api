@@ -255,7 +255,7 @@ GET /api/homepage-settings/trends/{sectionId}/services
 - `category_id` (선택사항): 특정 카테고리의 서비스만 조회
 
 **Headers** (로그인된 사용자의 경우):
-- `Authorization: Bearer {user_id}`: 북마크 정보 포함을 위한 사용자 인증
+- `Authorization: Bearer {access_token}`: 북마크 정보 포함을 위한 사용자 인증
 
 **Response**:
 ```json
