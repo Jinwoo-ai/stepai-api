@@ -1,409 +1,588 @@
 -- StepAI API Database Schema - AI 서비스 소개 및 이용방법 추천 서비스
 -- MySQL 8.0 이상 버전용
+-- 실제 STEPAI 데이터베이스 기준으로 생성됨
 
--- Users 테이블 (회원)
-CREATE TABLE users (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(50) NOT NULL COMMENT '이름',
-  email VARCHAR(100) UNIQUE NOT NULL COMMENT '이메일',
-  industry VARCHAR(50) COMMENT '업종',
-  job_role VARCHAR(50) COMMENT '직무',
-  job_level VARCHAR(30) COMMENT '직급',
-  experience_years INT COMMENT '연차',
-  user_type VARCHAR(20) DEFAULT 'member' COMMENT '사용자 타입', -- member, admin
-  user_status VARCHAR(20) DEFAULT 'active' COMMENT '사용자 상태', -- active, inactive, pending, deleted
-  deleted_at TIMESTAMP NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_email (email),
-  INDEX idx_type_status (user_type, user_status),
-  INDEX idx_industry (industry),
-  INDEX idx_job_role (job_role)
-);
+CREATE TABLE `access_tokens` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `token` varchar(255) NOT NULL,
+  `expires_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `token` (`token`),
+  KEY `idx_token` (`token`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_expires_at` (`expires_at`),
+  CONSTRAINT `access_tokens_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=52 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- User SNS 테이블 (SNS 로그인 정보)
-CREATE TABLE user_sns (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT NOT NULL,
-  sns_type VARCHAR(20) NOT NULL COMMENT 'SNS 종류', -- naver, kakao, google
-  sns_user_id VARCHAR(100) NOT NULL COMMENT 'SNS 사용자 ID',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_sns_user (sns_type, sns_user_id),
-  INDEX idx_user_id (user_id),
-  INDEX idx_sns_type (sns_type)
-);
+CREATE TABLE `ad_partnerships` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `company_name` varchar(100) NOT NULL COMMENT '회사명',
+  `contact_person` varchar(50) NOT NULL COMMENT '담당자명',
+  `contact_email` varchar(100) NOT NULL COMMENT '담당자 이메일',
+  `contact_phone` varchar(20) DEFAULT NULL COMMENT '연락처',
+  `partnership_type` varchar(50) NOT NULL COMMENT '제휴 유형',
+  `budget_range` varchar(50) DEFAULT NULL COMMENT '예산 범위',
+  `campaign_period` varchar(100) DEFAULT NULL COMMENT '캠페인 기간',
+  `target_audience` text DEFAULT NULL COMMENT '타겟 고객층',
+  `campaign_description` text DEFAULT NULL COMMENT '캠페인 설명',
+  `additional_requirements` text DEFAULT NULL COMMENT '추가 요구사항',
+  `attachment_url` varchar(500) DEFAULT NULL COMMENT '첨부파일 URL',
+  `inquiry_status` varchar(20) DEFAULT 'pending' COMMENT '문의 상태',
+  `admin_notes` text DEFAULT NULL COMMENT '관리자 메모',
+  `response_date` timestamp NULL DEFAULT NULL COMMENT '응답일',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_partnership_type` (`partnership_type`),
+  KEY `idx_inquiry_status` (`inquiry_status`),
+  KEY `idx_created_at` (`created_at`)
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Access Tokens 테이블 (액세스 토큰)
-CREATE TABLE access_tokens (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT NOT NULL,
-  token VARCHAR(255) NOT NULL UNIQUE COMMENT '액세스 토큰',
-  expires_at TIMESTAMP NOT NULL COMMENT '만료일시',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  INDEX idx_token (token),
-  INDEX idx_user_id (user_id),
-  INDEX idx_expires_at (expires_at)
-);
+CREATE TABLE `ai_service_categories` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ai_service_id` int(11) NOT NULL,
+  `category_id` int(11) NOT NULL,
+  `is_main_category` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_ai_service_category` (`ai_service_id`,`category_id`),
+  KEY `category_id` (`category_id`),
+  CONSTRAINT `ai_service_categories_ibfk_1` FOREIGN KEY (`ai_service_id`) REFERENCES `ai_services` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `ai_service_categories_ibfk_2` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=4588 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- AI Services 테이블 (AI 서비스)
-CREATE TABLE ai_services (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ai_name VARCHAR(100) NOT NULL, -- 서비스명(국문)
-  ai_name_en VARCHAR(100), -- 서비스명(영문)
-  ai_description TEXT, -- 한줄설명
-  ai_website VARCHAR(255), -- 대표 URL
-  ai_logo VARCHAR(255), -- 로고(URL)
-  company_name VARCHAR(100), -- 기업명(국문)
-  company_name_en VARCHAR(100), -- 기업명(영문)
-  embedded_video_url VARCHAR(500), -- 임베디드 영상 URL
-  headquarters VARCHAR(50), -- 본사
-  main_features TEXT, -- 주요기능
-  target_users TEXT, -- 타겟 사용자
-  use_cases TEXT, -- 추천활용사례
-  pricing_info TEXT,
-  difficulty_level VARCHAR(20) DEFAULT 'beginner', -- 난이도
-  usage_availability VARCHAR(10), -- 사용 (가능, 불가능)
-  ai_status VARCHAR(20) DEFAULT 'active',
-  is_visible BOOLEAN DEFAULT TRUE, -- Alive (Yes/No)
-  is_step_pick BOOLEAN DEFAULT FALSE, -- 표시위치 (STEP_PICK)
-  nationality VARCHAR(20), -- 본사 (deprecated, use headquarters)
-  deleted_at TIMESTAMP NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+CREATE TABLE `ai_service_category_display_order` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `category_id` int(11) NOT NULL,
+  `ai_service_id` int(11) NOT NULL,
+  `display_order` int(11) NOT NULL DEFAULT 0,
+  `is_featured` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_category_service_order` (`category_id`,`ai_service_id`),
+  KEY `ai_service_id` (`ai_service_id`),
+  KEY `idx_category_display_order` (`category_id`,`display_order`),
+  KEY `idx_category_featured` (`category_id`,`is_featured`,`display_order`),
+  CONSTRAINT `ai_service_category_display_order_ibfk_1` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `ai_service_category_display_order_ibfk_2` FOREIGN KEY (`ai_service_id`) REFERENCES `ai_services` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=513 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- AI Videos 테이블 (AI 영상)
-CREATE TABLE ai_videos (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  video_title VARCHAR(200) NOT NULL,
-  video_description TEXT,
-  video_url VARCHAR(255) NOT NULL,
-  thumbnail_url VARCHAR(255),
-  duration INT DEFAULT 0, -- 초 단위
-  video_status VARCHAR(20) DEFAULT 'active', -- active, inactive, pending, deleted
-  is_visible BOOLEAN DEFAULT TRUE, -- 사이트 노출여부
-  view_count INT DEFAULT 0,
-  like_count INT DEFAULT 0,
-  deleted_at TIMESTAMP NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+CREATE TABLE `ai_service_contents` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ai_service_id` int(11) NOT NULL,
+  `content_type` varchar(50) NOT NULL,
+  `content_title` varchar(200) DEFAULT NULL,
+  `content_text` text DEFAULT NULL,
+  `content_order` int(11) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_ai_service_contents_service` (`ai_service_id`),
+  KEY `idx_ai_service_contents_type` (`content_type`),
+  CONSTRAINT `ai_service_contents_ibfk_1` FOREIGN KEY (`ai_service_id`) REFERENCES `ai_services` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=6064 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Categories 테이블 (카테고리 - 메인/서브 구조)
-CREATE TABLE categories (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  category_name VARCHAR(100) NOT NULL,
-  category_description TEXT,
-  category_icon VARCHAR(255),
-  parent_id INT NULL, -- 부모 카테고리 ID (NULL이면 메인 카테고리)
-  category_order INT DEFAULT 0,
-  priority INT DEFAULT 0, -- 우선순위 (높을수록 상단 고정)
-  category_status VARCHAR(20) DEFAULT 'active', -- active, inactive
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (parent_id) REFERENCES categories(id)
-);
+CREATE TABLE `ai_service_pricing_models` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ai_service_id` int(11) NOT NULL,
+  `pricing_model_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_ai_service_pricing` (`ai_service_id`,`pricing_model_id`),
+  KEY `pricing_model_id` (`pricing_model_id`),
+  CONSTRAINT `ai_service_pricing_models_ibfk_1` FOREIGN KEY (`ai_service_id`) REFERENCES `ai_services` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `ai_service_pricing_models_ibfk_2` FOREIGN KEY (`pricing_model_id`) REFERENCES `pricing_models` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=5325 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Curations 테이블 (큐레이션)
-CREATE TABLE curations (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  curation_title VARCHAR(200) NOT NULL,
-  curation_description TEXT,
-  curation_thumbnail VARCHAR(255),
-  curation_order INT DEFAULT 0,
-  curation_status VARCHAR(20) DEFAULT 'active', -- active, inactive, pending, deleted
-  deleted_at TIMESTAMP NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+CREATE TABLE `ai_service_similar_services` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ai_service_id` int(11) NOT NULL,
+  `similar_service_id` int(11) NOT NULL,
+  `similarity_reason` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_similar_service` (`ai_service_id`,`similar_service_id`),
+  KEY `idx_ai_service_similar_service` (`ai_service_id`),
+  KEY `idx_ai_service_similar_similar` (`similar_service_id`),
+  CONSTRAINT `ai_service_similar_services_ibfk_1` FOREIGN KEY (`ai_service_id`) REFERENCES `ai_services` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `ai_service_similar_services_ibfk_2` FOREIGN KEY (`similar_service_id`) REFERENCES `ai_services` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=65 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Tags 테이블 (태그)
-CREATE TABLE tags (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  tag_name VARCHAR(50) UNIQUE NOT NULL,
-  tag_count INT DEFAULT 0, -- 사용 횟수
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+CREATE TABLE `ai_service_sns` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ai_service_id` int(11) NOT NULL,
+  `sns_type` varchar(50) NOT NULL,
+  `sns_url` varchar(500) NOT NULL,
+  `sns_order` int(11) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_ai_service_sns_service` (`ai_service_id`),
+  KEY `idx_ai_service_sns_type` (`sns_type`),
+  CONSTRAINT `ai_service_sns_ibfk_1` FOREIGN KEY (`ai_service_id`) REFERENCES `ai_services` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- AI Service Categories 테이블 (AI 서비스-카테고리 관계)
-CREATE TABLE ai_service_categories (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ai_service_id INT NOT NULL,
-  category_id INT NOT NULL,
-  is_main_category BOOLEAN DEFAULT FALSE, -- 메인(대표) 카테고리 여부
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
-  FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_ai_service_category (ai_service_id, category_id)
-);
+CREATE TABLE `ai_service_tags` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ai_service_id` int(11) NOT NULL,
+  `tag_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_ai_service_tag` (`ai_service_id`,`tag_id`),
+  KEY `tag_id` (`tag_id`),
+  CONSTRAINT `ai_service_tags_ibfk_1` FOREIGN KEY (`ai_service_id`) REFERENCES `ai_services` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `ai_service_tags_ibfk_2` FOREIGN KEY (`tag_id`) REFERENCES `tags` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=19615 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- AI Video Categories 테이블 (AI 영상-카테고리 관계)
-CREATE TABLE ai_video_categories (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ai_video_id INT NOT NULL,
-  category_id INT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (ai_video_id) REFERENCES ai_videos(id) ON DELETE CASCADE,
-  FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_ai_video_category (ai_video_id, category_id)
-);
+CREATE TABLE `ai_service_target_types` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ai_service_id` int(11) NOT NULL,
+  `target_type_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_ai_service_target` (`ai_service_id`,`target_type_id`),
+  KEY `target_type_id` (`target_type_id`),
+  CONSTRAINT `ai_service_target_types_ibfk_1` FOREIGN KEY (`ai_service_id`) REFERENCES `ai_services` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `ai_service_target_types_ibfk_2` FOREIGN KEY (`target_type_id`) REFERENCES `target_types` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=5091 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- AI Service Tags 테이블 (AI 서비스-태그 관계)
-CREATE TABLE ai_service_tags (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ai_service_id INT NOT NULL,
-  tag_id INT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
-  FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_ai_service_tag (ai_service_id, tag_id)
-);
+CREATE TABLE `ai_service_types` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ai_service_id` int(11) NOT NULL,
+  `ai_type_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_ai_service_type` (`ai_service_id`,`ai_type_id`),
+  KEY `ai_type_id` (`ai_type_id`),
+  CONSTRAINT `ai_service_types_ibfk_1` FOREIGN KEY (`ai_service_id`) REFERENCES `ai_services` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `ai_service_types_ibfk_2` FOREIGN KEY (`ai_type_id`) REFERENCES `ai_types` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=6602 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- AI Video Tags 테이블 (AI 영상-태그 관계)
-CREATE TABLE ai_video_tags (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ai_video_id INT NOT NULL,
-  tag_id INT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (ai_video_id) REFERENCES ai_videos(id) ON DELETE CASCADE,
-  FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_ai_video_tag (ai_video_id, tag_id)
-);
+CREATE TABLE `ai_service_views` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ai_service_id` int(11) NOT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `view_date` timestamp NOT NULL DEFAULT current_timestamp(),
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  KEY `idx_ai_service_views_service` (`ai_service_id`),
+  KEY `idx_ai_service_views_date` (`view_date`),
+  CONSTRAINT `ai_service_views_ibfk_1` FOREIGN KEY (`ai_service_id`) REFERENCES `ai_services` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `ai_service_views_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- AI Video Services 테이블 (AI 영상에서 사용된 AI 서비스)
-CREATE TABLE ai_video_services (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ai_video_id INT NOT NULL,
-  ai_service_id INT NOT NULL,
-  usage_description TEXT,
-  usage_order INT DEFAULT 0, -- 사용 순서
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (ai_video_id) REFERENCES ai_videos(id) ON DELETE CASCADE,
-  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_ai_video_service (ai_video_id, ai_service_id)
-);
+CREATE TABLE `ai_services` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ai_name` varchar(100) NOT NULL,
+  `ai_name_en` varchar(100) DEFAULT NULL,
+  `ai_description` text DEFAULT NULL,
+  `ai_website` varchar(255) DEFAULT NULL,
+  `ai_logo` varchar(255) DEFAULT NULL,
+  `company_name` varchar(100) DEFAULT NULL,
+  `company_name_en` varchar(100) DEFAULT NULL,
+  `embedded_video_url` varchar(500) DEFAULT NULL,
+  `headquarters` varchar(50) DEFAULT NULL,
+  `main_features` text DEFAULT NULL,
+  `target_users` text DEFAULT NULL,
+  `use_cases` text DEFAULT NULL,
+  `pricing_info` text DEFAULT NULL,
+  `difficulty_level` varchar(20) DEFAULT 'beginner',
+  `usage_availability` varchar(10) DEFAULT NULL,
+  `ai_status` varchar(20) DEFAULT 'active',
+  `is_visible` tinyint(1) DEFAULT 1,
+  `is_step_pick` tinyint(1) DEFAULT 0,
+  `is_new` tinyint(1) DEFAULT 0,
+  `nationality` varchar(20) DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_ai_services_status` (`ai_status`),
+  KEY `idx_ai_services_nationality` (`nationality`)
+) ENGINE=InnoDB AUTO_INCREMENT=540 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Curation AI Services 테이블 (큐레이션에 포함된 AI 서비스)
-CREATE TABLE curation_ai_services (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  curation_id INT NOT NULL,
-  ai_service_id INT NOT NULL,
-  service_order INT DEFAULT 0, -- 큐레이션 내 순서
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (curation_id) REFERENCES curations(id) ON DELETE CASCADE,
-  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_curation_ai_service (curation_id, ai_service_id)
-);
+CREATE TABLE `ai_types` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `type_name` varchar(50) NOT NULL,
+  `type_description` varchar(200) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `type_name` (`type_name`)
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- User Favorites 테이블 (사용자 즐겨찾기)
-CREATE TABLE user_favorites (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT NOT NULL,
-  favorite_type VARCHAR(20) NOT NULL, -- ai_service, ai_video, curation
-  favorite_id INT NOT NULL, -- AI 서비스, AI 영상, 큐레이션 ID
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_user_favorite (user_id, favorite_type, favorite_id)
-);
+CREATE TABLE `ai_video_categories` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ai_video_id` int(11) NOT NULL,
+  `category_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_ai_video_category` (`ai_video_id`,`category_id`),
+  KEY `category_id` (`category_id`),
+  CONSTRAINT `ai_video_categories_ibfk_1` FOREIGN KEY (`ai_video_id`) REFERENCES `ai_videos` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `ai_video_categories_ibfk_2` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- AI Service Views 테이블 (AI 서비스 조회 기록)
-CREATE TABLE ai_service_views (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ai_service_id INT NOT NULL,
-  user_id INT NULL,
-  view_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  ip_address VARCHAR(45),
-  user_agent TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-);
+CREATE TABLE `ai_video_services` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ai_video_id` int(11) NOT NULL,
+  `ai_service_id` int(11) NOT NULL,
+  `usage_description` text DEFAULT NULL,
+  `usage_order` int(11) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_ai_video_service` (`ai_video_id`,`ai_service_id`),
+  KEY `ai_service_id` (`ai_service_id`),
+  CONSTRAINT `ai_video_services_ibfk_1` FOREIGN KEY (`ai_video_id`) REFERENCES `ai_videos` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `ai_video_services_ibfk_2` FOREIGN KEY (`ai_service_id`) REFERENCES `ai_services` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=24 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- AI Video Views 테이블 (AI 영상 조회 기록)
-CREATE TABLE ai_video_views (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ai_video_id INT NOT NULL,
-  user_id INT NULL,
-  view_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  ip_address VARCHAR(45),
-  user_agent TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (ai_video_id) REFERENCES ai_videos(id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-);
+CREATE TABLE `ai_video_tags` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ai_video_id` int(11) NOT NULL,
+  `tag_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_ai_video_tag` (`ai_video_id`,`tag_id`),
+  KEY `tag_id` (`tag_id`),
+  CONSTRAINT `ai_video_tags_ibfk_1` FOREIGN KEY (`ai_video_id`) REFERENCES `ai_videos` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `ai_video_tags_ibfk_2` FOREIGN KEY (`tag_id`) REFERENCES `tags` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=44 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Reviews 테이블 (리뷰)
-CREATE TABLE reviews (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT NOT NULL,
-  review_type VARCHAR(20) NOT NULL, -- ai_service, ai_video
-  review_target_id INT NOT NULL, -- AI 서비스 또는 AI 영상 ID
-  rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
-  review_text TEXT,
-  review_status VARCHAR(20) DEFAULT 'active', -- active, hidden, deleted
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_user_review (user_id, review_type, review_target_id)
-);
+CREATE TABLE `ai_video_views` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ai_video_id` int(11) NOT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `view_date` timestamp NOT NULL DEFAULT current_timestamp(),
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  KEY `idx_ai_video_views_video` (`ai_video_id`),
+  KEY `idx_ai_video_views_date` (`view_date`),
+  CONSTRAINT `ai_video_views_ibfk_1` FOREIGN KEY (`ai_video_id`) REFERENCES `ai_videos` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `ai_video_views_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- AI Service Contents 테이블 (AI 서비스 콘텐츠)
-CREATE TABLE ai_service_contents (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ai_service_id INT NOT NULL,
-  content_type VARCHAR(50) NOT NULL, -- target_users, main_features, use_cases
-  content_title VARCHAR(200),
-  content_text TEXT,
-  content_order INT DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE
-);
+CREATE TABLE `ai_videos` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `video_title` varchar(200) NOT NULL,
+  `video_description` text DEFAULT NULL,
+  `video_url` varchar(255) NOT NULL,
+  `thumbnail_url` varchar(255) DEFAULT NULL,
+  `duration` int(11) DEFAULT 0,
+  `video_status` varchar(20) DEFAULT 'active',
+  `is_visible` tinyint(1) DEFAULT 1,
+  `view_count` int(11) DEFAULT 0,
+  `like_count` int(11) DEFAULT 0,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_ai_videos_status` (`video_status`),
+  KEY `idx_ai_videos_view_count` (`view_count`)
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- AI Service SNS 테이블 (AI 서비스 SNS)
-CREATE TABLE ai_service_sns (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ai_service_id INT NOT NULL,
-  sns_type VARCHAR(50) NOT NULL, -- twitter, facebook, instagram, youtube, linkedin, etc.
-  sns_url VARCHAR(500) NOT NULL,
-  sns_order INT DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE
-);
+CREATE TABLE `categories` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `category_name` varchar(100) NOT NULL,
+  `category_description` text DEFAULT NULL,
+  `category_icon` varchar(255) DEFAULT NULL,
+  `parent_id` int(11) DEFAULT NULL,
+  `category_order` int(11) DEFAULT 0,
+  `category_status` varchar(20) DEFAULT 'active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_categories_parent` (`parent_id`),
+  KEY `idx_categories_status` (`category_status`),
+  CONSTRAINT `categories_ibfk_1` FOREIGN KEY (`parent_id`) REFERENCES `categories` (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=100 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- AI Types 테이블 (AI 형태)
-CREATE TABLE ai_types (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  type_name VARCHAR(50) NOT NULL UNIQUE, -- WEB, MOB, DES, EXT, API
-  type_description TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+CREATE TABLE `curation_ai_services` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `curation_id` int(11) NOT NULL,
+  `ai_service_id` int(11) NOT NULL,
+  `service_order` int(11) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_curation_ai_service` (`curation_id`,`ai_service_id`),
+  KEY `ai_service_id` (`ai_service_id`),
+  CONSTRAINT `curation_ai_services_ibfk_1` FOREIGN KEY (`curation_id`) REFERENCES `curations` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `curation_ai_services_ibfk_2` FOREIGN KEY (`ai_service_id`) REFERENCES `ai_services` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=126 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Pricing Models 테이블 (가격 모델)
-CREATE TABLE pricing_models (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  model_name VARCHAR(50) NOT NULL UNIQUE, -- 유료, 무료, 프리미엄 등
-  model_description TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+CREATE TABLE `curations` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `curation_title` varchar(200) NOT NULL,
+  `curation_description` text DEFAULT NULL,
+  `curation_thumbnail` varchar(255) DEFAULT NULL,
+  `curation_order` int(11) DEFAULT 0,
+  `curation_status` varchar(20) DEFAULT 'active',
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Target Types 테이블 (타겟 타입)
-CREATE TABLE target_types (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  type_code VARCHAR(10) NOT NULL UNIQUE, -- B, C, G
-  type_name VARCHAR(50) NOT NULL, -- B2B, B2C, B2G
-  type_description TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+CREATE TABLE `homepage_curations` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `curation_id` int(11) NOT NULL,
+  `display_order` int(11) NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_homepage_curation` (`curation_id`),
+  KEY `idx_homepage_curation_order` (`display_order`,`is_active`),
+  CONSTRAINT `homepage_curations_ibfk_1` FOREIGN KEY (`curation_id`) REFERENCES `curations` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- AI Service Types 테이블 (AI 서비스-타입 관계)
-CREATE TABLE ai_service_types (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ai_service_id INT NOT NULL,
-  ai_type_id INT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
-  FOREIGN KEY (ai_type_id) REFERENCES ai_types(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_ai_service_type (ai_service_id, ai_type_id)
-);
+CREATE TABLE `homepage_step_pick_services` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ai_service_id` int(11) NOT NULL,
+  `category_id` int(11) DEFAULT NULL,
+  `display_order` int(11) NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_homepage_step_pick` (`ai_service_id`),
+  KEY `idx_homepage_step_pick_order` (`display_order`,`is_active`),
+  KEY `idx_homepage_step_pick_category` (`category_id`),
+  CONSTRAINT `homepage_step_pick_services_ibfk_1` FOREIGN KEY (`ai_service_id`) REFERENCES `ai_services` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `homepage_step_pick_services_ibfk_2` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=102 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- AI Service Pricing Models 테이블 (AI 서비스-가격모델 관계)
-CREATE TABLE ai_service_pricing_models (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ai_service_id INT NOT NULL,
-  pricing_model_id INT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
-  FOREIGN KEY (pricing_model_id) REFERENCES pricing_models(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_ai_service_pricing (ai_service_id, pricing_model_id)
-);
+CREATE TABLE `homepage_videos` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ai_video_id` int(11) NOT NULL,
+  `display_order` int(11) NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_homepage_video` (`ai_video_id`),
+  KEY `idx_homepage_video_order` (`display_order`,`is_active`),
+  CONSTRAINT `homepage_videos_ibfk_1` FOREIGN KEY (`ai_video_id`) REFERENCES `ai_videos` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- AI Service Target Types 테이블 (AI 서비스-타겟타입 관계)
-CREATE TABLE ai_service_target_types (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ai_service_id INT NOT NULL,
-  target_type_id INT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
-  FOREIGN KEY (target_type_id) REFERENCES target_types(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_ai_service_target (ai_service_id, target_type_id)
-);
+CREATE TABLE `inquiries` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL COMMENT '문의자 이름',
+  `email` varchar(255) NOT NULL COMMENT '문의자 이메일',
+  `phone` varchar(20) DEFAULT NULL COMMENT '문의자 전화번호',
+  `inquiry_type` enum('general','technical','partnership','bug_report','feature_request') DEFAULT 'general' COMMENT '문의 유형',
+  `subject` varchar(255) NOT NULL COMMENT '문의 제목',
+  `message` text NOT NULL COMMENT '문의 내용',
+  `attachment_url` varchar(500) DEFAULT NULL COMMENT '첨부파일 URL',
+  `inquiry_status` enum('pending','in_progress','resolved','closed') DEFAULT 'pending' COMMENT '문의 상태',
+  `admin_notes` text DEFAULT NULL COMMENT '관리자 메모',
+  `response_date` datetime DEFAULT NULL COMMENT '답변 일시',
+  `created_at` datetime DEFAULT current_timestamp() COMMENT '생성일시',
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp() COMMENT '수정일시',
+  PRIMARY KEY (`id`),
+  KEY `idx_inquiry_type` (`inquiry_type`),
+  KEY `idx_inquiry_status` (`inquiry_status`),
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_email` (`email`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='고객문의 테이블';
 
--- AI Service Similar Services 테이블 (유사 서비스)
-CREATE TABLE ai_service_similar_services (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ai_service_id INT NOT NULL,
-  similar_service_id INT NOT NULL,
-  similarity_reason TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (ai_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
-  FOREIGN KEY (similar_service_id) REFERENCES ai_services(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_similar_service (ai_service_id, similar_service_id)
-);
+CREATE TABLE `pricing_models` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `model_name` varchar(50) NOT NULL,
+  `model_description` varchar(200) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `model_name` (`model_name`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Rankings 테이블 (랭킹 결과 저장)
-CREATE TABLE rankings (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ranking_type VARCHAR(50) NOT NULL, -- ai_service, ai_video, category, curation
-  entity_id INT NOT NULL,
-  entity_type VARCHAR(50) NOT NULL, -- ai_service_id, ai_video_id, category_id, curation_id
-  total_score DECIMAL(10,3) DEFAULT 0,
-  view_count INT DEFAULT 0,
-  favorite_count INT DEFAULT 0,
-  avg_rating DECIMAL(3,2) DEFAULT 0,
-  ranking_date DATE NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+CREATE TABLE `rankings` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ranking_type` varchar(50) NOT NULL,
+  `entity_id` int(11) NOT NULL,
+  `entity_type` varchar(50) NOT NULL,
+  `total_score` decimal(10,3) NOT NULL,
+  `view_count` int(11) DEFAULT 0,
+  `favorite_count` int(11) DEFAULT 0,
+  `avg_rating` decimal(3,2) DEFAULT 0.00,
+  `ranking_date` date NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_ranking` (`ranking_type`,`entity_id`,`ranking_date`),
+  KEY `idx_rankings_type_date` (`ranking_type`,`ranking_date`),
+  KEY `idx_rankings_entity` (`entity_type`,`entity_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Site Settings 테이블 (사이트 정보 관리)
-CREATE TABLE site_settings (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  site_title VARCHAR(200) NOT NULL DEFAULT 'StepAI',
-  company_name VARCHAR(100) NOT NULL DEFAULT 'StepAI',
-  ceo_name VARCHAR(50),
-  business_number VARCHAR(20),
-  phone_number VARCHAR(20),
-  address TEXT,
-  privacy_officer VARCHAR(50),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+CREATE TABLE `reviews` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `review_type` varchar(20) NOT NULL,
+  `review_target_id` int(11) NOT NULL,
+  `rating` int(11) NOT NULL CHECK (`rating` >= 1 and `rating` <= 5),
+  `review_text` text DEFAULT NULL,
+  `review_status` varchar(20) DEFAULT 'active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_user_review` (`user_id`,`review_type`,`review_target_id`),
+  KEY `idx_reviews_type_target` (`review_type`,`review_target_id`),
+  KEY `idx_reviews_rating` (`rating`),
+  CONSTRAINT `reviews_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Ad Partnerships 테이블 (광고제휴)
-CREATE TABLE ad_partnerships (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  company_name VARCHAR(100) NOT NULL COMMENT '회사명',
-  contact_person VARCHAR(50) NOT NULL COMMENT '담당자명',
-  contact_email VARCHAR(100) NOT NULL COMMENT '담당자 이메일',
-  contact_phone VARCHAR(20) COMMENT '연락처',
-  partnership_type VARCHAR(50) NOT NULL COMMENT '제휴 유형', -- banner, sponsored_content, affiliate, etc.
-  budget_range VARCHAR(50) COMMENT '예산 범위',
-  campaign_period VARCHAR(100) COMMENT '캠페인 기간',
-  target_audience TEXT COMMENT '타겟 고객층',
-  campaign_description TEXT COMMENT '캠페인 설명',
-  additional_requirements TEXT COMMENT '추가 요구사항',
-  attachment_url VARCHAR(500) COMMENT '첨부파일 URL',
-  inquiry_status VARCHAR(20) DEFAULT 'pending' COMMENT '문의 상태', -- pending, reviewing, approved, rejected, completed
-  admin_notes TEXT COMMENT '관리자 메모',
-  response_date TIMESTAMP NULL COMMENT '응답일',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_partnership_type (partnership_type),
-  INDEX idx_inquiry_status (inquiry_status),
-  INDEX idx_created_at (created_at)
-);
+CREATE TABLE `site_settings` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `site_title` varchar(200) NOT NULL DEFAULT 'StepAI',
+  `company_name` varchar(100) NOT NULL DEFAULT 'StepAI',
+  `ceo_name` varchar(50) DEFAULT NULL,
+  `business_number` varchar(20) DEFAULT NULL,
+  `phone_number` varchar(20) DEFAULT NULL,
+  `address` text DEFAULT NULL,
+  `privacy_officer` varchar(50) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `tags` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `tag_name` varchar(50) NOT NULL,
+  `tag_count` int(11) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `tag_name` (`tag_name`)
+) ENGINE=InnoDB AUTO_INCREMENT=3502 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `target_types` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `type_code` varchar(10) NOT NULL,
+  `type_name` varchar(50) NOT NULL,
+  `type_description` varchar(200) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `type_code` (`type_code`)
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `trend_section_services` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `trend_section_id` int(11) NOT NULL,
+  `ai_service_id` int(11) NOT NULL,
+  `category_id` int(11) DEFAULT NULL,
+  `display_order` int(11) NOT NULL DEFAULT 0,
+  `is_featured` tinyint(1) DEFAULT 0,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_trend_service` (`trend_section_id`,`ai_service_id`),
+  KEY `ai_service_id` (`ai_service_id`),
+  KEY `idx_trend_service_order` (`trend_section_id`,`display_order`,`is_featured`),
+  KEY `idx_trend_section_services_display_order` (`display_order`),
+  KEY `category_id` (`category_id`),
+  CONSTRAINT `trend_section_services_ibfk_1` FOREIGN KEY (`trend_section_id`) REFERENCES `trend_sections` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `trend_section_services_ibfk_2` FOREIGN KEY (`ai_service_id`) REFERENCES `ai_services` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `trend_section_services_ibfk_3` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=42 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `trend_sections` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `section_type` varchar(50) NOT NULL,
+  `section_title` varchar(100) NOT NULL,
+  `section_description` text DEFAULT NULL,
+  `is_category_based` tinyint(1) DEFAULT 1,
+  `is_active` tinyint(1) DEFAULT 1,
+  `display_order` int(11) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_trend_section` (`section_type`)
+) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `user_favorite_services` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `ai_service_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_user_service` (`user_id`,`ai_service_id`),
+  KEY `ai_service_id` (`ai_service_id`),
+  KEY `idx_user_favorite_services_user_id` (`user_id`),
+  CONSTRAINT `user_favorite_services_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `user_favorite_services_ibfk_2` FOREIGN KEY (`ai_service_id`) REFERENCES `ai_services` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `user_favorite_videos` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `ai_video_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_user_video` (`user_id`,`ai_video_id`),
+  KEY `ai_video_id` (`ai_video_id`),
+  KEY `idx_user_favorite_videos_user_id` (`user_id`),
+  CONSTRAINT `user_favorite_videos_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `user_favorite_videos_ibfk_2` FOREIGN KEY (`ai_video_id`) REFERENCES `ai_videos` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `user_favorites` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `favorite_type` varchar(20) NOT NULL,
+  `favorite_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_user_favorite` (`user_id`,`favorite_type`,`favorite_id`),
+  KEY `idx_user_favorites_user` (`user_id`),
+  KEY `idx_user_favorites_type` (`favorite_type`,`favorite_id`),
+  CONSTRAINT `user_favorites_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `user_sns` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `sns_type` varchar(20) NOT NULL COMMENT 'SNS 종류',
+  `sns_user_id` varchar(100) NOT NULL COMMENT 'SNS 사용자 ID',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_sns_user` (`sns_type`,`sns_user_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_sns_type` (`sns_type`),
+  CONSTRAINT `fk_user_sns_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `users` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(50) DEFAULT NULL,
+  `email` varchar(100) NOT NULL,
+  `password` varchar(255) DEFAULT NULL,
+  `industry` varchar(50) DEFAULT NULL,
+  `job_role` varchar(50) DEFAULT NULL,
+  `job_level` varchar(30) DEFAULT NULL,
+  `experience_years` int(11) DEFAULT NULL,
+  `user_type` varchar(20) DEFAULT 'member',
+  `user_status` varchar(20) DEFAULT 'active',
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `email` (`email`),
+  KEY `idx_users_email` (`email`),
+  KEY `idx_users_type_status` (`user_type`,`user_status`)
+) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
