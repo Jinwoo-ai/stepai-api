@@ -23,8 +23,9 @@ const getDbConfig = () => {
     charset: 'utf8mb4',
     timezone: '+09:00',
     connectionLimit: 10,
-    acquireTimeout: 60000,
-    timeout: 60000
+    queueLimit: 0,
+    idleTimeout: 60000,
+    acquireTimeout: 60000
   };
 };
 

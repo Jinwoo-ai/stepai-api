@@ -191,7 +191,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { curation_title, curation_description, curation_thumbnail, curation_order, curation_status } = req.body;
+    const { curation_title, curation_description, curation_thumbnail, curation_order, curation_status, ai_service_ids } = req.body;
     
     if (isNaN(id)) {
       return res.status(400).json({
@@ -208,37 +208,70 @@ router.put('/:id', async (req, res) => {
     }
 
     const pool = getDatabaseConnection();
-    const query = `
-      UPDATE curations SET
-        curation_title = ?,
-        curation_description = ?,
-        curation_thumbnail = ?,
-        curation_order = ?,
-        curation_status = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND curation_status != 'deleted'
-    `;
+    const connection = await pool.getConnection();
+    
+    try {
+      await connection.beginTransaction();
+      
+      // 큐레이션 기본 정보 업데이트
+      const updateQuery = `
+        UPDATE curations SET
+          curation_title = ?,
+          curation_description = ?,
+          curation_thumbnail = ?,
+          curation_order = ?,
+          curation_status = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND curation_status != 'deleted'
+      `;
 
-    const [result] = await pool.execute<ResultSetHeader>(query, [
-      curation_title,
-      curation_description || null,
-      curation_thumbnail || null,
-      curation_order || 0,
-      curation_status || 'active',
-      id
-    ]);
-    
-    if (result.affectedRows === 0) {
-      return res.status(404).json({
-        success: false,
-        error: '큐레이션을 찾을 수 없습니다.'
+      const [result] = await connection.execute<ResultSetHeader>(updateQuery, [
+        curation_title,
+        curation_description || null,
+        curation_thumbnail || null,
+        curation_order || 0,
+        curation_status || 'active',
+        id
+      ]);
+      
+      if (result.affectedRows === 0) {
+        await connection.rollback();
+        return res.status(404).json({
+          success: false,
+          error: '큐레이션을 찾을 수 없습니다.'
+        });
+      }
+      
+      // AI 서비스 목록이 제공된 경우 업데이트
+      if (ai_service_ids && Array.isArray(ai_service_ids)) {
+        // 기존 서비스들 삭제
+        await connection.execute(
+          'DELETE FROM curation_ai_services WHERE curation_id = ?',
+          [id]
+        );
+        
+        // 새로운 서비스들 추가
+        for (let i = 0; i < ai_service_ids.length; i++) {
+          const serviceId = ai_service_ids[i];
+          await connection.execute(
+            'INSERT INTO curation_ai_services (curation_id, ai_service_id, service_order) VALUES (?, ?, ?)',
+            [id, serviceId, i + 1]
+          );
+        }
+      }
+      
+      await connection.commit();
+      
+      res.json({
+        success: true,
+        message: '큐레이션이 성공적으로 수정되었습니다.'
       });
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
     }
-    
-    res.json({
-      success: true,
-      message: '큐레이션이 성공적으로 수정되었습니다.'
-    });
   } catch (error) {
     console.error('큐레이션 수정 실패:', error);
     res.status(500).json({ success: false, error: '큐레이션 수정에 실패했습니다.' });
