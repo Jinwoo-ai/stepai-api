@@ -29,9 +29,11 @@ export class UserService {
   async snsLogin(data: SnsLoginRequest): Promise<LoginResponse> {
     const connection = await this.getConnection();
     try {
-      // 기존 SNS 계정 확인
+      // 기존 SNS 계정 확인 (탈퇴하지 않은 사용자만)
       const [snsRows] = await connection.execute(
-        'SELECT user_id FROM user_sns WHERE sns_type = ? AND sns_user_id = ?',
+        `SELECT s.user_id FROM user_sns s 
+         INNER JOIN users u ON s.user_id = u.id 
+         WHERE s.sns_type = ? AND s.sns_user_id = ? AND u.deleted_at IS NULL`,
         [data.sns_type, data.sns_user_id]
       );
 
@@ -39,35 +41,68 @@ export class UserService {
       let isNewUser = false;
 
       if ((snsRows as any[]).length > 0) {
-        // 기존 사용자
+        // 기존 사용자 (탈퇴하지 않은)
         userId = (snsRows as any[])[0].user_id;
       } else {
-        // 새 사용자 생성 - 필수 필드만 체크
-        if (!data.name || !data.email || !data.sns_type || !data.sns_user_id) {
-          throw new Error('필수 정보가 누락되었습니다. (name, email, sns_type, sns_user_id)');
+        // 탈퇴한 사용자인지 확인
+        const [deletedSnsRows] = await connection.execute(
+          `SELECT s.user_id FROM user_sns s 
+           INNER JOIN users u ON s.user_id = u.id 
+           WHERE s.sns_type = ? AND s.sns_user_id = ? AND u.deleted_at IS NOT NULL`,
+          [data.sns_type, data.sns_user_id]
+        );
+
+        if ((deletedSnsRows as any[]).length > 0) {
+          // 탈퇴한 사용자의 재가입 - 기존 계정 복구
+          const deletedUserId = (deletedSnsRows as any[])[0].user_id;
+          
+          // 사용자 정보 업데이트 및 복구
+          await connection.execute(
+            `UPDATE users SET 
+             name = ?, email = ?, industry = ?, job_role = ?, job_level = ?, experience_years = ?,
+             user_status = 'active', deleted_at = NULL, updated_at = NOW()
+             WHERE id = ?`,
+            [
+              data.name, 
+              data.email, 
+              data.industry || null, 
+              data.job_role || null, 
+              data.job_level || null, 
+              data.experience_years || null,
+              deletedUserId
+            ]
+          );
+          
+          userId = deletedUserId;
+          isNewUser = true; // 재가입으로 간주하여 웹훅 전송
+        } else {
+          // 완전히 새로운 사용자 생성 - 필수 필드만 체크
+          if (!data.name || !data.email || !data.sns_type || !data.sns_user_id) {
+            throw new Error('필수 정보가 누락되었습니다. (name, email, sns_type, sns_user_id)');
+          }
+          
+          const [userResult] = await connection.execute(
+            `INSERT INTO users (name, email, industry, job_role, job_level, experience_years) 
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+              data.name, 
+              data.email, 
+              data.industry || null, 
+              data.job_role || null, 
+              data.job_level || null, 
+              data.experience_years || null
+            ]
+          );
+
+          userId = (userResult as any).insertId;
+          isNewUser = true;
+
+          // SNS 정보 저장
+          await connection.execute(
+            'INSERT INTO user_sns (user_id, sns_type, sns_user_id) VALUES (?, ?, ?)',
+            [userId, data.sns_type, data.sns_user_id]
+          );
         }
-        
-        const [userResult] = await connection.execute(
-          `INSERT INTO users (name, email, industry, job_role, job_level, experience_years) 
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [
-            data.name, 
-            data.email, 
-            data.industry || null, 
-            data.job_role || null, 
-            data.job_level || null, 
-            data.experience_years || null
-          ]
-        );
-
-        userId = (userResult as any).insertId;
-        isNewUser = true;
-
-        // SNS 정보 저장
-        await connection.execute(
-          'INSERT INTO user_sns (user_id, sns_type, sns_user_id) VALUES (?, ?, ?)',
-          [userId, data.sns_type, data.sns_user_id]
-        );
       }
 
       // 액세스 토큰 생성
