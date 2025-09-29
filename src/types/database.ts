@@ -5,6 +5,7 @@ export interface User {
   id: number;
   name: string;
   email: string;
+  password?: string;
   industry?: string;
   job_role?: string;
   job_level?: string;
@@ -573,6 +574,17 @@ export interface SnsLoginRequest {
   job_role?: string;
   job_level?: string;
   experience_years?: number;
+}
+
+// 관리자 로그인 관련 타입들
+export interface AdminLoginRequest {
+  email: string;
+  password?: string;
+}
+
+export interface AdminSetPasswordRequest {
+  email: string;
+  password: string;
 }
 
 // 고객문의 관련 타입들

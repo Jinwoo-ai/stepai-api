@@ -1,6 +1,7 @@
 import express from 'express';
 import { getDatabaseConnection } from '../configs/database';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { authenticateAdmin, AdminAuthenticatedRequest } from '../middleware/adminAuth';
 
 const router = express.Router();
 
@@ -134,7 +135,7 @@ router.get('/:id', async (req, res) => {
  *     summary: 큐레이션 생성
  *     tags: [Curations]
  */
-router.post('/', async (req, res) => {
+router.post('/', authenticateAdmin, async (req: AdminAuthenticatedRequest, res) => {
   try {
     const { curation_title, curation_description, curation_thumbnail, curation_order } = req.body;
     
@@ -188,7 +189,7 @@ router.post('/', async (req, res) => {
  *     summary: 큐레이션 수정
  *     tags: [Curations]
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticateAdmin, async (req: AdminAuthenticatedRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     const { curation_title, curation_description, curation_thumbnail, curation_order, curation_status, ai_service_ids } = req.body;
@@ -285,7 +286,7 @@ router.put('/:id', async (req, res) => {
  *     summary: 큐레이션 삭제
  *     tags: [Curations]
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateAdmin, async (req: AdminAuthenticatedRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     

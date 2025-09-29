@@ -1,6 +1,7 @@
 import express from 'express';
 import { getDatabaseConnection } from '../configs/database';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { authenticateAdmin, AdminAuthenticatedRequest } from '../middleware/adminAuth';
 
 const router = express.Router();
 
@@ -56,7 +57,7 @@ router.get('/videos', async (req, res) => {
  *     summary: 메인페이지 영상 설정 업데이트
  *     tags: [Homepage Settings]
  */
-router.put('/videos', async (req, res) => {
+router.put('/videos', authenticateAdmin, async (req: AdminAuthenticatedRequest, res) => {
   const pool = getDatabaseConnection();
   const connection = await pool.getConnection();
   
@@ -126,7 +127,7 @@ router.get('/curations', async (req, res) => {
  *     summary: 메인페이지 큐레이션 설정 업데이트
  *     tags: [Homepage Settings]
  */
-router.put('/curations', async (req, res) => {
+router.put('/curations', authenticateAdmin, async (req: AdminAuthenticatedRequest, res) => {
   const pool = getDatabaseConnection();
   const connection = await pool.getConnection();
   
@@ -209,25 +210,36 @@ router.get('/step-pick', async (req, res) => {
  *     summary: 메인페이지 STEP PICK 설정 업데이트 (카테고리별)
  *     tags: [Homepage Settings]
  */
-router.put('/step-pick', async (req, res) => {
+router.put('/step-pick', authenticateAdmin, async (req: AdminAuthenticatedRequest, res) => {
   const pool = getDatabaseConnection();
   const connection = await pool.getConnection();
   
   try {
     const { services, category_id } = req.body;
+    
+    // 카테고리별 설정이므로 category_id가 필수
+    if (!category_id) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '카테고리를 선택하고 편집해주세요.' 
+      });
+    }
+    
     await connection.beginTransaction();
 
     // 특정 카테고리의 기존 설정만 삭제
-    if (category_id) {
-      await connection.execute('DELETE FROM homepage_step_pick_services WHERE category_id = ?', [category_id]);
-    } else {
-      await connection.execute('DELETE FROM homepage_step_pick_services WHERE category_id IS NULL');
-    }
+    await connection.execute('DELETE FROM homepage_step_pick_services WHERE category_id = ?', [category_id]);
 
+    // UPSERT 방식으로 데이터 삽입
     for (const service of services) {
       await connection.execute(
-        'INSERT INTO homepage_step_pick_services (ai_service_id, category_id, display_order, is_active) VALUES (?, ?, ?, ?)',
-        [service.ai_service_id, category_id || null, service.display_order, service.is_active]
+        `INSERT INTO homepage_step_pick_services (ai_service_id, category_id, display_order, is_active) 
+         VALUES (?, ?, ?, ?) 
+         ON DUPLICATE KEY UPDATE 
+         category_id = VALUES(category_id), 
+         display_order = VALUES(display_order), 
+         is_active = VALUES(is_active)`,
+        [service.ai_service_id, category_id, service.display_order, service.is_active]
       );
     }
 
@@ -280,7 +292,7 @@ router.get('/trends', async (req, res) => {
  *     summary: 트렌드 섹션 설정 업데이트
  *     tags: [Homepage Settings]
  */
-router.put('/trends', async (req, res) => {
+router.put('/trends', authenticateAdmin, async (req: AdminAuthenticatedRequest, res) => {
   const pool = getDatabaseConnection();
   const connection = await pool.getConnection();
   
@@ -336,7 +348,7 @@ router.put('/trends', async (req, res) => {
  *     summary: 트렌드 섹션 삭제
  *     tags: [Homepage Settings]
  */
-router.delete('/trends/:sectionId', async (req, res) => {
+router.delete('/trends/:sectionId', authenticateAdmin, async (req: AdminAuthenticatedRequest, res) => {
   const pool = getDatabaseConnection();
   const connection = await pool.getConnection();
   
@@ -497,13 +509,26 @@ router.get('/trends/:sectionId/services', async (req, res) => {
  *     summary: 트렌드 섹션별 서비스 설정 업데이트 (카테고리별 지원)
  *     tags: [Homepage Settings]
  */
-router.put('/trends/:sectionId/services', async (req, res) => {
+router.put('/trends/:sectionId/services', authenticateAdmin, async (req: AdminAuthenticatedRequest, res) => {
   const pool = getDatabaseConnection();
   const connection = await pool.getConnection();
   
   try {
     const sectionId = parseInt(req.params.sectionId);
     const { services, category_id } = req.body;
+    
+    // 트렌드 섹션이 카테고리 기반인지 확인
+    const [sectionInfo] = await pool.execute<RowDataPacket[]>(
+      'SELECT is_category_based FROM trend_sections WHERE id = ?',
+      [sectionId]
+    );
+    
+    if (sectionInfo.length > 0 && sectionInfo[0].is_category_based && !category_id) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '카테고리를 선택하고 편집해주세요.' 
+      });
+    }
     
     await connection.beginTransaction();
 

@@ -1,6 +1,7 @@
 import express from 'express';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { getDatabaseConnection } from '../configs/database';
+import { authenticateAdmin, AdminAuthenticatedRequest } from '../middleware/adminAuth';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
 import path from 'path';
@@ -1120,7 +1121,7 @@ const mapDifficultyLevelReverse = (difficulty: string): string => {
 // Excel 업로드는 별도 라우터(excelUpload.ts)에서 처리
 
 // AI 서비스 생성
-router.post('/', async (req, res) => {
+router.post('/', authenticateAdmin, async (req: AdminAuthenticatedRequest, res) => {
   try {
     const pool = getDatabaseConnection();
     const connection = await pool.getConnection();
@@ -1271,7 +1272,7 @@ router.post('/', async (req, res) => {
 });
 
 // 유사 서비스 추가
-router.post('/:id/similar-services', async (req, res) => {
+router.post('/:id/similar-services', authenticateAdmin, async (req: AdminAuthenticatedRequest, res) => {
   try {
     const serviceId = parseInt(req.params.id);
     const { similar_service_id } = req.body;
@@ -1314,7 +1315,7 @@ router.post('/:id/similar-services', async (req, res) => {
 });
 
 // 유사 서비스 제거
-router.delete('/:id/similar-services/:similarId', async (req, res) => {
+router.delete('/:id/similar-services/:similarId', authenticateAdmin, async (req: AdminAuthenticatedRequest, res) => {
   try {
     const serviceId = parseInt(req.params.id);
     const similarId = parseInt(req.params.similarId);
@@ -1353,7 +1354,7 @@ router.delete('/:id/similar-services/:similarId', async (req, res) => {
 });
 
 // AI 서비스 삭제
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateAdmin, async (req: AdminAuthenticatedRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     
@@ -1422,7 +1423,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // AI 서비스 수정
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticateAdmin, async (req: AdminAuthenticatedRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     const pool = getDatabaseConnection();

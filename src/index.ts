@@ -28,6 +28,7 @@ import setupMyPicksRouter from './routes/setup-my-picks';
 import uploadRouter from './routes/upload';
 import inquiriesRouter from './routes/inquiries';
 import excelUploadRouter from './routes/excelUpload';
+import adminAuthRouter from './routes/adminAuth';
 
 const app = express();
 const PORT = parseInt(process.env['PORT'] || '3004');
@@ -307,6 +308,7 @@ app.use('/api/setup', setupMyPicksRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/inquiries', inquiriesRouter);
 app.use('/api/ai-services', excelUploadRouter);
+app.use('/api/admin', adminAuthRouter);
 
 // 헬스체크 엔드포인트
 app.get('/health', async (_req, res) => {

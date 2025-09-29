@@ -1,6 +1,7 @@
 import express from 'express';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { getDatabaseConnection } from '../configs/database';
+import { authenticateAdmin, AdminAuthenticatedRequest } from '../middleware/adminAuth';
 
 const router = express.Router();
 
@@ -139,7 +140,7 @@ router.get('/', async (req, res) => {
 });
 
 // AI 영상 생성
-router.post('/', async (req, res) => {
+router.post('/', authenticateAdmin, async (req: AdminAuthenticatedRequest, res) => {
   try {
     const { 
       video_title, 
@@ -211,15 +212,11 @@ router.post('/', async (req, res) => {
           );
         }
         
-        // 태그 사용 횟수 업데이트
+        // 태그 사용 횟수 업데이트 (선택된 태그들만)
         for (const tagId of selected_tags) {
           await connection.execute(
-            `UPDATE tags SET tag_count = (
-              SELECT COUNT(*) FROM ai_service_tags WHERE tag_id = ?
-            ) + (
-              SELECT COUNT(*) FROM ai_video_tags WHERE tag_id = ?
-            ) WHERE id = ?`,
-            [tagId, tagId, tagId]
+            'UPDATE tags SET tag_count = tag_count + 1 WHERE id = ?',
+            [tagId]
           );
         }
       }
@@ -247,7 +244,7 @@ router.post('/', async (req, res) => {
 });
 
 // AI 영상 수정
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticateAdmin, async (req: AdminAuthenticatedRequest, res) => {
   try {
     const id = parseInt(req.params.id);
     const { 
@@ -342,6 +339,13 @@ router.put('/:id', async (req, res) => {
 
       // 태그 업데이트
       if (selected_tags !== undefined) {
+        // 기존 태그 조회 (업데이트할 태그들 파악용)
+        const [oldTags] = await connection.execute<RowDataPacket[]>(
+          'SELECT tag_id FROM ai_video_tags WHERE ai_video_id = ?',
+          [id]
+        );
+        const oldTagIds = oldTags.map(tag => tag['tag_id']);
+        
         // 기존 태그 연결 삭제
         await connection.execute('DELETE FROM ai_video_tags WHERE ai_video_id = ?', [id]);
         
@@ -354,16 +358,16 @@ router.put('/:id', async (req, res) => {
           }
         }
         
-        // 모든 태그의 사용 횟수 업데이트
-        const [allTags] = await connection.execute<RowDataPacket[]>('SELECT id FROM tags');
-        for (const tag of allTags) {
+        // 변경된 태그들만 사용 횟수 업데이트
+        const affectedTagIds = [...new Set([...oldTagIds, ...selected_tags])];
+        for (const tagId of affectedTagIds) {
           await connection.execute(
             `UPDATE tags SET tag_count = (
               SELECT COUNT(*) FROM ai_service_tags WHERE tag_id = ?
             ) + (
               SELECT COUNT(*) FROM ai_video_tags WHERE tag_id = ?
             ) WHERE id = ?`,
-            [tag.id, tag.id, tag.id]
+            [tagId, tagId, tagId]
           );
         }
       }
@@ -390,7 +394,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // AI 영상 삭제
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateAdmin, async (req: AdminAuthenticatedRequest, res) => {
   try {
     const id = parseInt(req.params.id);
 
