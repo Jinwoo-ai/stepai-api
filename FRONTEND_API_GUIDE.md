@@ -276,6 +276,18 @@ GET /api/homepage-settings/trends/{sectionId}/services
       "is_step_pick": false,
       "is_new": true,
       "category_name": "문서·글쓰기",
+      "categories": [
+        {
+          "id": 1,
+          "category_name": "문서·글쓰기",
+          "is_main_category": true
+        },
+        {
+          "id": 11,
+          "category_name": "AI글쓰기",
+          "is_main_category": false
+        }
+      ],
       "tags": ["AI글쓰기", "대화형에이전트"],
       "is_bookmarked": false
     }
@@ -285,6 +297,8 @@ GET /api/homepage-settings/trends/{sectionId}/services
 
 **필드 설명**:
 - `is_new`: 관리자가 설정한 신규 서비스 표시 여부 (`true`/`false`)
+- `category_id`, `category_name`: 대표(메인) 카테고리 정보
+- `categories[]`: 모든 카테고리 정보 (메인/서브 포함)
 - `tags`: AI 서비스에 연결된 태그 목록 (배열)
 - `is_bookmarked`: 로그인된 사용자의 경우만 포함, `user_favorites` 테이블 기반
 
@@ -380,10 +394,18 @@ GET /api/ai-services/{id}?include_categories=true
     "difficulty_level": "beginner",
     "usage_availability": "웹, 모바일 앱",
     "embedded_video_url": "https://youtube.com/embed/...",
+    "category_id": 1,
+    "category_name": "AI 어시스턴트",
     "categories": [
       {
         "id": 1,
-        "category_name": "AI 어시스턴트"
+        "category_name": "AI 어시스턴트",
+        "is_main_category": true
+      },
+      {
+        "id": 11,
+        "category_name": "대화형에이전트",
+        "is_main_category": false
       }
     ],
     "tags": "#AI글쓰기 #대화형에이전트",
@@ -481,10 +503,18 @@ GET /api/ai-services/search?q=검색어
         "company_name": "(주)로앤컴퍼니",
         "is_step_pick": false,
         "is_new": false,
+        "category_id": 1,
+        "category_name": "법률·전문서비스",
         "categories": [
           {
             "id": 1,
-            "category_name": "법률·전문서비스"
+            "category_name": "법률·전문서비스",
+            "is_main_category": true
+          },
+          {
+            "id": 11,
+            "category_name": "계약서 작성",
+            "is_main_category": false
           }
         ]
       }
@@ -508,6 +538,8 @@ GET /api/ai-services/search?q=검색어
 **필드 설명**:
 - `search_answer`: AI가 생성한 검색 결과에 대한 설명 및 추천 답변
 - `ai_services`: 검색어와 관련된 AI 서비스 목록 (최대 20개)
+  - `category_id`, `category_name`: 대표(메인) 카테고리 정보
+  - `categories[]`: 모든 카테고리 정보 (메인/서브 포함)
 - `videos`: 검색어와 관련된 영상 목록 (최대 10개)
 - `source`: 응답 소스 ("webhook" 또는 "fallback")
 
