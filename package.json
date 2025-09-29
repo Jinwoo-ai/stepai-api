@@ -30,9 +30,9 @@
   "license": "MIT",
   "dependencies": {
     "@types/axios": "^0.14.4",
-    "@types/bcrypt": "^6.0.0",
+    "@types/bcryptjs": "^2.4.6",
     "axios": "^1.12.2",
-    "bcrypt": "^5.1.1",
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.18.2",
