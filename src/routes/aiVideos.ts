@@ -13,6 +13,15 @@ router.get('/', async (req, res) => {
     const search = req.query['search'] as string;
     const category_id = req.query['category_id'] ? parseInt(req.query['category_id'] as string) : undefined;
     const video_status = req.query['video_status'] as string;
+    
+    // 로그인된 사용자 ID 추출
+    let userId = null;
+    if (req.headers.authorization) {
+      const token = req.headers.authorization.replace('Bearer ', '');
+      if (!isNaN(parseInt(token))) {
+        userId = parseInt(token);
+      }
+    }
 
     const pool = getDatabaseConnection();
     const connection = await pool.getConnection();
@@ -106,12 +115,23 @@ router.get('/', async (req, res) => {
         let tagsString = tags.map(tag => tag['tag_name']).join(' #');
         if (tagsString) tagsString = '#' + tagsString;
         
+        // 북마크 정보 추가
+        let isBookmarked = false;
+        if (userId) {
+          const [bookmarkResult] = await connection.execute<RowDataPacket[]>(
+            'SELECT id FROM user_favorite_videos WHERE user_id = ? AND ai_video_id = ?',
+            [userId, video.id]
+          );
+          isBookmarked = bookmarkResult.length > 0;
+        }
+        
         videosWithCategories.push({
           ...video,
           categories: categories,
           ai_services: aiServices,
           tags: tagsString,
-          tag_ids: tags.map(tag => tag['id']) // Admin 인터페이스에서 필요
+          tag_ids: tags.map(tag => tag['id']), // Admin 인터페이스에서 필요
+          is_bookmarked: userId ? isBookmarked : undefined
         });
       }
 
@@ -441,6 +461,15 @@ router.delete('/:id', authenticateAdmin, async (req: AdminAuthenticatedRequest, 
 router.get('/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    
+    // 로그인된 사용자 ID 추출
+    let userId = null;
+    if (req.headers.authorization) {
+      const token = req.headers.authorization.replace('Bearer ', '');
+      if (!isNaN(parseInt(token))) {
+        userId = parseInt(token);
+      }
+    }
 
     if (isNaN(id)) {
       return res.status(400).json({
@@ -522,6 +551,16 @@ router.get('/:id', async (req, res) => {
         [id]
       );
 
+      // 북마크 정보 추가
+      let isBookmarked = false;
+      if (userId) {
+        const [bookmarkResult] = await connection.execute<RowDataPacket[]>(
+          'SELECT id FROM user_favorite_videos WHERE user_id = ? AND ai_video_id = ?',
+          [userId, id]
+        );
+        isBookmarked = bookmarkResult.length > 0;
+      }
+
       res.json({
         success: true,
         data: {
@@ -531,7 +570,8 @@ router.get('/:id', async (req, res) => {
           related_videos: {
             previous: prevVideos.length > 0 ? prevVideos[0] : null,
             next: nextVideos
-          }
+          },
+          is_bookmarked: userId ? isBookmarked : undefined
         }
       });
     } finally {

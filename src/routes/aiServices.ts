@@ -586,6 +586,15 @@ router.get('/:id', async (req, res) => {
     const id = parseInt(req.params.id);
     const include_categories = req.query['include_categories'] !== 'false'; // 기본값을 true로 변경
     
+    // 로그인된 사용자 ID 추출
+    let userId = null;
+    if (req.headers.authorization) {
+      const token = req.headers.authorization.replace('Bearer ', '');
+      if (!isNaN(parseInt(token))) {
+        userId = parseInt(token);
+      }
+    }
+    
     if (isNaN(id)) {
       return res.status(400).json({
         success: false,
@@ -727,6 +736,15 @@ router.get('/:id', async (req, res) => {
         serviceData['flag_icon'] = `${baseUrl}/uploads/icons/국가없음.png`;
       }
       
+      // 북마크 정보 추가
+      if (userId) {
+        const [bookmarkResult] = await connection.execute<RowDataPacket[]>(
+          'SELECT id FROM user_favorite_services WHERE user_id = ? AND ai_service_id = ?',
+          [userId, id]
+        );
+        serviceData['is_bookmarked'] = bookmarkResult.length > 0;
+      }
+      
       res.json({
         success: true,
         data: serviceData
@@ -759,6 +777,15 @@ router.get('/', async (req, res) => {
   const nationality = req.query['nationality'] as string;
   const sort = req.query['sort'] as string;
   const include_categories = req.query['include_categories'] === 'true';
+  
+  // 로그인된 사용자 ID 추출
+  let userId = null;
+  if (req.headers.authorization) {
+    const token = req.headers.authorization.replace('Bearer ', '');
+    if (!isNaN(parseInt(token))) {
+      userId = parseInt(token);
+    }
+  }
   
   try {
 
@@ -854,20 +881,42 @@ router.get('/', async (req, res) => {
         `;
       }
       
-      const [services] = await connection.execute<RowDataPacket[]>(
-        `SELECT DISTINCT ai_services.*, 
+      let serviceQuery = `SELECT DISTINCT ai_services.*, 
                 COALESCE(ai_services.ai_name_en, '') as ai_name_en,
                 mc.id as main_category_id,
-                mc.category_name as main_category_name
+                mc.category_name as main_category_name`;
+      
+      if (userId) {
+        serviceQuery += `,
+                CASE WHEN uf.id IS NOT NULL THEN true ELSE false END as is_bookmarked`;
+      }
+      
+      serviceQuery += `
          FROM ai_services 
          LEFT JOIN ai_service_categories main_ascat ON ai_services.id = main_ascat.ai_service_id AND main_ascat.is_main_category = 1
          LEFT JOIN categories mc ON main_ascat.category_id = mc.id
-         ${category_id && !sort ? 'LEFT JOIN ai_service_category_display_order cdo ON ai_services.id = cdo.ai_service_id AND cdo.category_id = ?' : ''}
+         ${category_id && !sort ? 'LEFT JOIN ai_service_category_display_order cdo ON ai_services.id = cdo.ai_service_id AND cdo.category_id = ?' : ''}`;
+      
+      if (userId) {
+        serviceQuery += `
+         LEFT JOIN user_favorite_services uf ON ai_services.id = uf.ai_service_id AND uf.user_id = ?`;
+      }
+      
+      serviceQuery += `
          WHERE ${whereClause} 
          ORDER BY ${orderByClause}
-         LIMIT ? OFFSET ?`,
-        (category_id && !sort) ? [category_id, ...queryParams, limit, offset] : [...queryParams, limit, offset]
-      );
+         LIMIT ? OFFSET ?`;
+      
+      const serviceQueryParams = [];
+      if (category_id && !sort) {
+        serviceQueryParams.push(category_id);
+      }
+      if (userId) {
+        serviceQueryParams.push(userId);
+      }
+      serviceQueryParams.push(...queryParams, limit, offset);
+      
+      const [services] = await connection.execute<RowDataPacket[]>(serviceQuery, serviceQueryParams);
 
       // 카테고리 정보 포함
       const servicesWithCategories = [];
@@ -982,6 +1031,11 @@ router.get('/', async (req, res) => {
           }
         } else {
           serviceData['flag_icon'] = `${baseUrl}/uploads/icons/국가없음.png`;
+        }
+        
+        // 북마크 정보 추가
+        if (userId) {
+          serviceData['is_bookmarked'] = !!service['is_bookmarked'];
         }
         
         servicesWithCategories.push(serviceData);

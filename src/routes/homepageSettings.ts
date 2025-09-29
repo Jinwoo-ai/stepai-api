@@ -167,6 +167,15 @@ router.get('/step-pick', async (req, res) => {
     const pool = getDatabaseConnection();
     const categoryId = req.query.category_id as string;
     
+    // 로그인된 사용자 ID 추출
+    let userId = null;
+    if (req.headers.authorization) {
+      const token = req.headers.authorization.replace('Bearer ', '');
+      if (!isNaN(parseInt(token))) {
+        userId = parseInt(token);
+      }
+    }
+    
     let query = `
       SELECT 
         hsp.id,
@@ -179,14 +188,30 @@ router.get('/step-pick', async (req, res) => {
         ais.ai_description,
         ais.ai_logo,
         ais.company_name,
-        c.category_name
+        c.category_name`;
+    
+    if (userId) {
+      query += `,
+        CASE WHEN uf.id IS NOT NULL THEN true ELSE false END as is_bookmarked`;
+    }
+    
+    query += `
       FROM homepage_step_pick_services hsp
       JOIN ai_services ais ON hsp.ai_service_id = ais.id
-      LEFT JOIN categories c ON hsp.category_id = c.id
-      WHERE hsp.is_active = TRUE
-    `;
+      LEFT JOIN categories c ON hsp.category_id = c.id`;
+    
+    if (userId) {
+      query += `
+      LEFT JOIN user_favorite_services uf ON ais.id = uf.ai_service_id AND uf.user_id = ?`;
+    }
+    
+    query += `
+      WHERE hsp.is_active = TRUE`;
     
     const params: any[] = [];
+    if (userId) {
+      params.push(userId);
+    }
     
     if (categoryId) {
       query += ` AND hsp.category_id = ?`;
@@ -196,7 +221,14 @@ router.get('/step-pick', async (req, res) => {
     query += ` ORDER BY hsp.category_id ASC, hsp.display_order ASC`;
 
     const [rows] = await pool.execute<RowDataPacket[]>(query, params);
-    res.json({ success: true, data: rows });
+    
+    // 북마크 정보 처리
+    const processedRows = rows.map(row => ({
+      ...row,
+      is_bookmarked: userId ? !!row.is_bookmarked : undefined
+    }));
+    
+    res.json({ success: true, data: processedRows });
   } catch (error) {
     console.error('메인페이지 STEP PICK 조회 실패:', error);
     res.status(500).json({ success: false, error: '메인페이지 STEP PICK 조회에 실패했습니다.' });
@@ -434,10 +466,10 @@ router.get('/trends/:sectionId/services', async (req, res) => {
       LEFT JOIN tags t ON ast.tag_id = t.id
     `;
     
-    // 로그인된 유저인 경우 user_favorites 테이블 조인
+    // 로그인된 유저인 경우 user_favorite_services 테이블 조인
     if (userId) {
       query += `
-      LEFT JOIN user_favorites uf ON ais.id = uf.favorite_id AND uf.user_id = ? AND uf.favorite_type = 'ai_service'
+      LEFT JOIN user_favorite_services uf ON ais.id = uf.ai_service_id AND uf.user_id = ?
       `;
     }
     
@@ -721,6 +753,15 @@ router.get('/', async (req, res) => {
     const pool = getDatabaseConnection();
     const categoryId = req.query.category_id as string;
     
+    // 로그인된 사용자 ID 추출
+    let userId = null;
+    if (req.headers.authorization) {
+      const token = req.headers.authorization.replace('Bearer ', '');
+      if (!isNaN(parseInt(token))) {
+        userId = parseInt(token);
+      }
+    }
+    
     // 1. 영상 데이터 조회
     const [homepageVideosCount] = await pool.execute<RowDataPacket[]>(
       'SELECT COUNT(*) as count FROM homepage_videos WHERE is_active = TRUE'
@@ -780,16 +821,32 @@ router.get('/', async (req, res) => {
         ais.is_new,
         c.category_name,
         mc.id as main_category_id,
-        mc.category_name as main_category_name
+        mc.category_name as main_category_name`;
+    
+    if (userId) {
+      stepPickQuery += `,
+        CASE WHEN uf.id IS NOT NULL THEN true ELSE false END as is_bookmarked`;
+    }
+    
+    stepPickQuery += `
       FROM homepage_step_pick_services hsp
       JOIN ai_services ais ON hsp.ai_service_id = ais.id
       LEFT JOIN categories c ON hsp.category_id = c.id
       LEFT JOIN ai_service_categories ascat ON ais.id = ascat.ai_service_id AND ascat.is_main_category = 1
-      LEFT JOIN categories mc ON ascat.category_id = mc.id
-      WHERE hsp.is_active = TRUE
-    `;
+      LEFT JOIN categories mc ON ascat.category_id = mc.id`;
+    
+    if (userId) {
+      stepPickQuery += `
+      LEFT JOIN user_favorite_services uf ON ais.id = uf.ai_service_id AND uf.user_id = ?`;
+    }
+    
+    stepPickQuery += `
+      WHERE hsp.is_active = TRUE`;
     
     const stepPickParams: any[] = [];
+    if (userId) {
+      stepPickParams.push(userId);
+    }
     if (categoryId) {
       stepPickQuery += ` AND hsp.category_id = ?`;
       stepPickParams.push(categoryId);
@@ -799,7 +856,7 @@ router.get('/', async (req, res) => {
     
     const [stepPickResult] = await pool.execute<RowDataPacket[]>(stepPickQuery, stepPickParams);
     
-    // 각 STEP PICK 서비스의 모든 카테고리 정보 조회
+    // 각 STEP PICK 서비스의 모든 카테고리 정보 조회 및 북마크 정보 처리
     for (const service of stepPickResult) {
       const [allCategories] = await pool.execute<RowDataPacket[]>(
         `SELECT c.id, c.category_name, ascat.is_main_category
@@ -812,6 +869,11 @@ router.get('/', async (req, res) => {
       service.categories = allCategories;
       service.category_id = service.main_category_id;
       service.category_name = service.main_category_name;
+      
+      // 북마크 정보 처리
+      if (userId) {
+        service.is_bookmarked = !!service.is_bookmarked;
+      }
     }
     
     // 4. 트렌드 섹션 데이터 조회

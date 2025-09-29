@@ -68,6 +68,7 @@
     - `ai_status`: 상태 필터 (active, inactive, pending, deleted)
     - `is_step_pick`: Step Pick 여부 (true, false)
     - `include_categories`: 카테고리 정보 포함 여부 (true, false)
+  - **Headers** (로그인된 사용자): `Authorization: Bearer {user_id}`
   - **Response**: 
     ```json
     {
@@ -133,6 +134,7 @@
     - `search`: 검색어 (영상 제목, 설명)
     - `category_id`: 카테고리 ID 필터
     - `video_status`: 상태 필터 (active, inactive, pending, deleted)
+  - **Headers** (로그인된 사용자): `Authorization: Bearer {user_id}`
   - **Response**: 
     ```json
     {
@@ -169,6 +171,7 @@
 
 - **GET** `/api/ai-videos/{id}`
   - **설명**: AI 영상 상세 조회 (카테고리, AI 서비스 정보 포함)
+  - **Headers** (로그인된 사용자): `Authorization: Bearer {user_id}`
   - **Response**: 
     ```json
     {

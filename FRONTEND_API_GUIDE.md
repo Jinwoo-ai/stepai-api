@@ -17,6 +17,9 @@ GET /api/homepage-settings
 **Query Parameters**:
 - `category_id` (선택사항): 특정 카테고리의 STEP PICK 및 트렌드 서비스만 조회
 
+**Headers** (로그인된 사용자의 경우):
+- `Authorization: Bearer {user_id}`: 북마크 정보 포함을 위한 사용자 인증
+
 **Response**:
 ```json
 {
@@ -152,6 +155,9 @@ GET /api/homepage-settings/step-pick
 **Query Parameters**:
 - `category_id` (선택사항): 특정 카테고리의 STEP PICK 서비스만 조회
 
+**Headers** (로그인된 사용자의 경우):
+- `Authorization: Bearer {user_id}`: 북마크 정보 포함을 위한 사용자 인증
+
 **Response**:
 ```json
 {
@@ -167,8 +173,8 @@ GET /api/homepage-settings/step-pick
       "ai_description": "OpenAI의 대화형 AI 모델",
       "ai_logo": "/uploads/icons/chatgpt.png",
       "company_name": "OpenAI",
-      "category_name": "문서·글쓰기"
-    }
+      "category_name": "문서·글쓰기",
+      "is_bookmarked": false
   ]
 }
 ```
@@ -301,7 +307,7 @@ GET /api/homepage-settings/trends/{sectionId}/services
 - `category_id`, `category_name`: 대표(메인) 카테고리 정보
 - `categories[]`: 모든 카테고리 정보 (메인/서브 포함)
 - `tags`: AI 서비스에 연결된 태그 목록 (배열)
-- `is_bookmarked`: 로그인된 사용자의 경우만 포함, `user_favorites` 테이블 기반
+- `is_bookmarked`: 로그인된 사용자의 경우만 포함, `user_favorite_services` 테이블 기반
 
 ## 📂 카테고리 페이지 API
 
@@ -342,6 +348,9 @@ GET /api/ai-services?category_id=1&ai_status=active&include_categories=true&page
 ```
 **설명**: 특정 카테고리의 AI 서비스 목록 조회 (페이지네이션 포함)
 
+**Headers** (로그인된 사용자의 경우):
+- `Authorization: Bearer {user_id}`: 북마크 정보 포함을 위한 사용자 인증
+
 **Query Parameters**:
 - `category_id`: 카테고리 ID
 - `ai_status`: 서비스 상태 (active, inactive)
@@ -376,6 +385,9 @@ GET /api/ai-services?category_id=1&ai_status=active&include_categories=true&page
 GET /api/ai-services/{id}?include_categories=true
 ```
 **설명**: AI 서비스 상세 정보 조회 (카테고리, 콘텐츠, 유사 서비스 포함)
+
+**Headers** (로그인된 사용자의 경우):
+- `Authorization: Bearer {user_id}`: 북마크 정보 포함을 위한 사용자 인증
 
 **Response**:
 ```json
@@ -426,7 +438,8 @@ GET /api/ai-services/{id}?include_categories=true
         "ai_logo": "/uploads/icons/claude.png",
         "company_name": "Anthropic"
       }
-    ]
+    ],
+    "is_bookmarked": false
   }
 }
 ```
@@ -448,11 +461,17 @@ GET /api/ai-videos?page=1&limit=20
 - `category`: 카테고리 필터 (선택사항)
 - `search`: 검색어 (선택사항)
 
+**Headers** (로그인된 사용자의 경우):
+- `Authorization: Bearer {user_id}`: 북마크 정보 포함을 위한 사용자 인증
+
 ### 2. 영상 상세 조회
 ```http
 GET /api/ai-videos/{id}
 ```
 **설명**: 영상 상세 정보 조회 (연관 AI 서비스 포함)
+
+**Headers** (로그인된 사용자의 경우):
+- `Authorization: Bearer {user_id}`: 북마크 정보 포함을 위한 사용자 인증
 
 **Response**:
 ```json
@@ -476,7 +495,8 @@ GET /api/ai-videos/{id}
         "ai_logo": "/uploads/icons/chatgpt.png",
         "usage_order": 1
       }
-    ]
+    ],
+    "is_bookmarked": false
   }
 }
 ```
@@ -1384,8 +1404,8 @@ GET /api/homepage-settings?category_id=1
         "ai_description": "OpenAI의 대화형 인공지능 챗봇 서비스",
         "ai_logo": null,
         "company_name": "OpenAI",
-        "category_name": "AI 글쓰기"
-      }
+        "category_name": "AI 글쓰기",
+        "is_bookmarked": false
     ],
     "trends": [
       {
