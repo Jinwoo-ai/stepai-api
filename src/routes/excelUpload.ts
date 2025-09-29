@@ -1,6 +1,7 @@
 import express from 'express';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { getDatabaseConnection } from '../configs/database';
+import { authenticateAdmin, AdminAuthenticatedRequest } from '../middleware/adminAuth';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
 import path from 'path';
@@ -33,10 +34,10 @@ const mapDifficultyLevel = (difficulty: string): string => {
 };
 
 // 엑셀 업로드 엔드포인트 (타임아웃 방지 개선 버전)
-router.post('/upload-excel', upload.single('excel'), async (req, res) => {
-  // 응답 타임아웃 설정 (5분)
-  req.setTimeout(300000);
-  res.setTimeout(300000);
+router.post('/upload-excel', authenticateAdmin, upload.single('excel'), async (req: AdminAuthenticatedRequest, res) => {
+  // 응답 타임아웃 설정 (10분)
+  req.setTimeout(600000);
+  res.setTimeout(600000);
   
   try {
     if (!req.file) {
@@ -67,7 +68,7 @@ router.post('/upload-excel', upload.single('excel'), async (req, res) => {
       const errors: string[] = [];
 
       // 배치 처리를 위한 청크 크기 설정
-      const BATCH_SIZE = 5; // 더 작은 배치로 처리
+      const BATCH_SIZE = 2; // 대용량 파일을 위해 더 작은 배치로 처리
       const totalRows = data.length;
       
       console.log(`총 ${totalRows}개 행을 ${BATCH_SIZE}개씩 배치 처리 시작`);
@@ -92,27 +93,38 @@ router.post('/upload-excel', upload.single('excel'), async (req, res) => {
                 continue;
               }
 
-              // ai_name_en 기준으로 기존 서비스 확인 (없으면 ai_name으로 확인)
+              let serviceId: number;
+              let isUpdate = false;
               let existingServices = [];
-              if (row['서비스명(영문)']) {
+
+              // ID가 있으면 ID 기준으로 확인
+              if (row['id']) {
+                const numericId = parseInt(row['id'].toString().replace(/^0+/, ''), 10);
                 const [services] = await connection.execute<RowDataPacket[]>(
-                  'SELECT id FROM ai_services WHERE ai_name_en = ? AND deleted_at IS NULL',
-                  [row['서비스명(영문)']]
+                  'SELECT id FROM ai_services WHERE id = ? AND deleted_at IS NULL',
+                  [numericId]
                 );
                 existingServices = services;
               }
               
-              // ai_name_en으로 찾지 못했으면 ai_name으로 확인
+              // ID로 찾지 못했으면 기존 방식으로 확인
               if (existingServices.length === 0) {
-                const [services] = await connection.execute<RowDataPacket[]>(
-                  'SELECT id FROM ai_services WHERE ai_name = ? AND deleted_at IS NULL',
-                  [row['서비스명(국문)']]
-                );
-                existingServices = services;
+                if (row['서비스명(영문)']) {
+                  const [services] = await connection.execute<RowDataPacket[]>(
+                    'SELECT id FROM ai_services WHERE ai_name_en = ? AND deleted_at IS NULL',
+                    [row['서비스명(영문)']]
+                  );
+                  existingServices = services;
+                }
+                
+                if (existingServices.length === 0) {
+                  const [services] = await connection.execute<RowDataPacket[]>(
+                    'SELECT id FROM ai_services WHERE ai_name = ? AND deleted_at IS NULL',
+                    [row['서비스명(국문)']]
+                  );
+                  existingServices = services;
+                }
               }
-
-              let serviceId: number;
-              let isUpdate = false;
 
               if (existingServices.length > 0) {
                 // 기존 서비스 업데이트 (로고 보존)
@@ -167,38 +179,74 @@ router.post('/upload-excel', upload.single('excel'), async (req, res) => {
                 await connection.execute('DELETE FROM ai_service_categories WHERE ai_service_id = ?', [serviceId]);
                 await connection.execute('DELETE FROM ai_service_contents WHERE ai_service_id = ?', [serviceId]);
               } else {
-                // 새 서비스 생성
-                const [result] = await connection.execute<ResultSetHeader>(
-                  `INSERT INTO ai_services (
-                    ai_name, ai_name_en, ai_description, ai_website, ai_logo,
-                    company_name, company_name_en, embedded_video_url, headquarters,
-                    main_features, target_users, use_cases,
-                    pricing_info, difficulty_level, usage_availability,
-                    ai_status, is_visible, is_step_pick, is_new
-                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                  [
-                    row['서비스명(국문)'],
-                    row['서비스명(영문)'] || null,
-                    row['한줄설명'] || null,
-                    row['대표 URL'] || null,
-                    row['로고(URL)'] || null,
-                    row['기업명(국문)'] || null,
-                    row['기업명(영문)'] || null,
-                    row['임베디드 영상 URL'] || null,
-                    row['본사'] || null,
-                    row['주요기능'] || null,
-                    row['타겟 사용자'] || null,
-                    row['추천활용사례'] || null,
-                    row['Price'] || null,
-                    mapDifficultyLevel(row['난이도']) || 'beginner',
-                    row['사용'] || null,
-                    'active',
-                    row['Alive'] === 'Yes' || true,
-                    row['표시위치'] === 'STEP_PICK' || false,
-                    row['NEW'] === 'Yes' || false
-                  ]
-                );
-                serviceId = result.insertId!;
+                // 새 서비스 생성 (ID 지정 가능)
+                if (row['id']) {
+                  const numericId = parseInt(row['id'].toString().replace(/^0+/, ''), 10);
+                  await connection.execute(
+                    `INSERT INTO ai_services (
+                      id, ai_name, ai_name_en, ai_description, ai_website, ai_logo,
+                      company_name, company_name_en, embedded_video_url, headquarters,
+                      main_features, target_users, use_cases,
+                      pricing_info, difficulty_level, usage_availability,
+                      ai_status, is_visible, is_step_pick, is_new
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                      numericId,
+                      row['서비스명(국문)'],
+                      row['서비스명(영문)'] || null,
+                      row['한줄설명'] || null,
+                      row['대표 URL'] || null,
+                      row['로고(URL)'] || null,
+                      row['기업명(국문)'] || null,
+                      row['기업명(영문)'] || null,
+                      row['임베디드 영상 URL'] || null,
+                      row['본사'] || null,
+                      row['주요기능'] || null,
+                      row['타겟 사용자'] || null,
+                      row['추천활용사례'] || null,
+                      row['Price'] || null,
+                      mapDifficultyLevel(row['난이도']) || 'beginner',
+                      row['사용'] || null,
+                      'active',
+                      row['Alive'] === 'Yes' || true,
+                      row['표시위치'] === 'STEP_PICK' || false,
+                      row['NEW'] === 'Yes' || false
+                    ]
+                  );
+                  serviceId = numericId;
+                } else {
+                  const [result] = await connection.execute<ResultSetHeader>(
+                    `INSERT INTO ai_services (
+                      ai_name, ai_name_en, ai_description, ai_website, ai_logo,
+                      company_name, company_name_en, embedded_video_url, headquarters,
+                      main_features, target_users, use_cases,
+                      pricing_info, difficulty_level, usage_availability,
+                      ai_status, is_visible, is_step_pick, is_new
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                      row['서비스명(국문)'],
+                      row['서비스명(영문)'] || null,
+                      row['한줄설명'] || null,
+                      row['대표 URL'] || null,
+                      row['로고(URL)'] || null,
+                      row['기업명(국문)'] || null,
+                      row['기업명(영문)'] || null,
+                      row['임베디드 영상 URL'] || null,
+                      row['본사'] || null,
+                      row['주요기능'] || null,
+                      row['타겟 사용자'] || null,
+                      row['추천활용사례'] || null,
+                      row['Price'] || null,
+                      mapDifficultyLevel(row['난이도']) || 'beginner',
+                      row['사용'] || null,
+                      'active',
+                      row['Alive'] === 'Yes' || true,
+                      row['표시위치'] === 'STEP_PICK' || false,
+                      row['NEW'] === 'Yes' || false
+                    ]
+                  );
+                  serviceId = result.insertId!;
+                }
               }
 
               // AI 타입 처리 (형태 컬럼)
@@ -263,7 +311,7 @@ router.post('/upload-excel', upload.single('excel'), async (req, res) => {
               // 메인 카테고리 처리 (대표 카테고리로 설정)
               if (row['메인 카테고리']) {
                 const [mainCategories] = await connection.execute<RowDataPacket[]>(
-                  'SELECT id FROM categories WHERE category_name = ? AND category_status = "active" AND parent_id IS NULL',
+                  'SELECT id FROM categories WHERE REPLACE(category_name, " ", "") = REPLACE(?, " ", "") AND category_status = "active" AND parent_id IS NULL',
                   [row['메인 카테고리']]
                 );
                 
@@ -280,9 +328,9 @@ router.post('/upload-excel', upload.single('excel'), async (req, res) => {
                 const subCategoryNames = row['서브 카테고리'].toString().split(/[,;]/).map((name: string) => name.trim()).filter((name: string) => name);
                 
                 for (const subCategoryName of subCategoryNames) {
-                  // 서브 카테고리 존재 확인 (모든 카테고리에서 검색)
+                  // 서브 카테고리 존재 확인 (공백 제거 후 비교)
                   const [subCategories] = await connection.execute<RowDataPacket[]>(
-                    'SELECT id FROM categories WHERE category_name = ? AND category_status = "active"',
+                    'SELECT id FROM categories WHERE REPLACE(category_name, " ", "") = REPLACE(?, " ", "") AND category_status = "active"',
                     [subCategoryName]
                   );
                   
@@ -298,36 +346,71 @@ router.post('/upload-excel', upload.single('excel'), async (req, res) => {
               // 태그 처리 (Tags 컬럼에서 #으로 시작하는 태그들 추출)
               if (row['Tags']) {
                 const tagText = row['Tags'].toString();
-                const tagMatches = tagText.match(/#([^#\s]+)/g);
+                // # 기호로 시작하는 태그들을 추출 (공백과 특수문자 고려)
+                const tagMatches = tagText.match(/#([^#\s,;]+)/g);
                 
-                if (tagMatches) {
+                if (tagMatches && tagMatches.length > 0) {
+                  console.log(`서비스 ID ${serviceId}: ${tagMatches.length}개 태그 처리 중...`);
+                  
                   for (const tagMatch of tagMatches) {
-                    const tagName = tagMatch.substring(1); // # 제거
+                    const tagName = tagMatch.substring(1).trim(); // # 제거 및 공백 제거
                     
-                    // 태그가 존재하는지 확인
-                    let [existingTags] = await connection.execute<RowDataPacket[]>(
-                      'SELECT id FROM tags WHERE tag_name = ?',
-                      [tagName]
-                    );
-                    
-                    let tagId;
-                    if (existingTags.length > 0) {
-                      tagId = existingTags[0]['id'];
-                    } else {
-                      // 새 태그 생성
-                      const [newTag] = await connection.execute<ResultSetHeader>(
-                        'INSERT INTO tags (tag_name) VALUES (?)',
-                        [tagName]
-                      );
-                      tagId = newTag.insertId;
+                    if (tagName) { // 빈 태그명 제외
+                      try {
+                        // 태그가 존재하는지 확인 (공백 제거 후 비교)
+                        let [existingTags] = await connection.execute<RowDataPacket[]>(
+                          'SELECT id FROM tags WHERE REPLACE(TRIM(tag_name), " ", "") = REPLACE(TRIM(?), " ", "")',
+                          [tagName]
+                        );
+                        
+                        let tagId;
+                        if (existingTags.length > 0) {
+                          tagId = existingTags[0]['id'];
+                          console.log(`  - 기존 태그 사용: #${tagName} (ID: ${tagId})`);
+                        } else {
+                          // 새 태그 생성
+                          try {
+                            const [newTag] = await connection.execute<ResultSetHeader>(
+                              'INSERT INTO tags (tag_name, tag_count) VALUES (?, ?)',
+                              [tagName, 1]
+                            );
+                            tagId = newTag.insertId;
+                            console.log(`  - 새 태그 생성: #${tagName} (ID: ${tagId})`);
+                          } catch (insertError) {
+                            // 동시성 문제로 이미 생성된 경우 다시 조회
+                            const [retryTags] = await connection.execute<RowDataPacket[]>(
+                              'SELECT id FROM tags WHERE tag_name = ?',
+                              [tagName]
+                            );
+                            if (retryTags.length > 0) {
+                              tagId = retryTags[0]['id'];
+                              console.log(`  - 재조회된 태그: #${tagName} (ID: ${tagId})`);
+                            } else {
+                              console.error(`  - 태그 생성 실패: #${tagName}`);
+                              continue;
+                            }
+                          }
+                        }
+                        
+                        // AI 서비스와 태그 연결
+                        await connection.execute(
+                          'INSERT IGNORE INTO ai_service_tags (ai_service_id, tag_id) VALUES (?, ?)',
+                          [serviceId, tagId]
+                        );
+                        
+                        // 태그 사용 횟수 증가
+                        await connection.execute(
+                          'UPDATE tags SET tag_count = tag_count + 1 WHERE id = ?',
+                          [tagId]
+                        );
+                        
+                      } catch (tagError) {
+                        console.error(`태그 처리 오류 (#${tagName}):`, tagError.message);
+                      }
                     }
-                    
-                    // AI 서비스와 태그 연결
-                    await connection.execute(
-                      'INSERT IGNORE INTO ai_service_tags (ai_service_id, tag_id) VALUES (?, ?)',
-                      [serviceId, tagId]
-                    );
                   }
+                } else {
+                  console.log(`서비스 ID ${serviceId}: 태그 패턴 매칭 실패 - ${tagText}`);
                 }
               }
 
@@ -387,32 +470,47 @@ router.post('/upload-excel', upload.single('excel'), async (req, res) => {
         for (let i = 0; i < data.length; i++) {
           const row = data[i] as any;
           
-          if (row['서비스명(국문)'] && row['유사 서비스']) {
-            const [currentService] = await connection.execute<RowDataPacket[]>(
-              'SELECT id FROM ai_services WHERE ai_name = ? AND deleted_at IS NULL',
-              [row['서비스명(국문)']]
-            );
+          if (row['유사 서비스']) {
+            let currentServiceId: number | null = null;
             
-            if (currentService.length > 0) {
-              const serviceId = currentService[0]['id'];
-              const similarServicesText = row['유사 서비스'];
-              const similarNames = similarServicesText.split(/[,;]/).map((name: string) => name.trim()).filter((name: string) => name);
+            // 현재 서비스 ID 찾기
+            if (row['id']) {
+              currentServiceId = parseInt(row['id'].toString().replace(/^0+/, ''), 10);
+            } else if (row['서비스명(국문)']) {
+              const [currentService] = await connection.execute<RowDataPacket[]>(
+                'SELECT id FROM ai_services WHERE ai_name = ? AND deleted_at IS NULL',
+                [row['서비스명(국문)']]
+              );
+              if (currentService.length > 0) {
+                currentServiceId = currentService[0]['id'];
+              }
+            }
+            
+            if (currentServiceId) {
+              const similarServicesText = row['유사 서비스'].toString();
+              const similarIds = similarServicesText.split('\n')
+                .map((id: string) => id.trim())
+                .filter((id: string) => id)
+                .map((id: string) => parseInt(id.replace(/^0+/, ''), 10));
               
-              for (const similarName of similarNames) {
-                const [matchingServices] = await connection.execute<RowDataPacket[]>(
-                  'SELECT id FROM ai_services WHERE ai_name = ? AND id != ? AND deleted_at IS NULL',
-                  [similarName, serviceId]
-                );
-                
-                for (const matchingService of matchingServices) {
-                  await connection.execute(
-                    'INSERT IGNORE INTO ai_service_similar_services (ai_service_id, similar_service_id) VALUES (?, ?)',
-                    [serviceId, matchingService['id']]
+              for (const similarId of similarIds) {
+                if (similarId !== currentServiceId) {
+                  // 유사 서비스가 실제로 존재하는지 확인
+                  const [existingSimilar] = await connection.execute<RowDataPacket[]>(
+                    'SELECT id FROM ai_services WHERE id = ? AND deleted_at IS NULL',
+                    [similarId]
                   );
-                  await connection.execute(
-                    'INSERT IGNORE INTO ai_service_similar_services (ai_service_id, similar_service_id) VALUES (?, ?)',
-                    [matchingService['id'], serviceId]
-                  );
+                  
+                  if (existingSimilar.length > 0) {
+                    await connection.execute(
+                      'INSERT IGNORE INTO ai_service_similar_services (ai_service_id, similar_service_id) VALUES (?, ?)',
+                      [currentServiceId, similarId]
+                    );
+                    await connection.execute(
+                      'INSERT IGNORE INTO ai_service_similar_services (ai_service_id, similar_service_id) VALUES (?, ?)',
+                      [similarId, currentServiceId]
+                    );
+                  }
                 }
               }
             }
@@ -437,7 +535,7 @@ router.post('/upload-excel', upload.single('excel'), async (req, res) => {
           updateCount,
           errorCount,
           errors: errors.slice(0, 10),
-          description: '엑셀 업로드 시 주의사항:\n\n필드 설명:\n- 서비스명(국문): 필수 필드\n- 서비스명(영문): 중복 확인 기준\n- 로고(URL): AI 서비스 로고 이미지 URL\n- 난이도: 초급/중급/고급 입력\n- Alive: Yes/No (서비스 활성 상태)\n- 표시위치: STEP_PICK 또는 빈값 (메인페이지 STEP PICK 섹션 표시)\n- NEW: Yes/No (신규 서비스 표시 - 카드에 NEW 뱃지 표시)\n- 메인 카테고리: 대표 카테고리 1개\n- 서브 카테고리: 콤마로 구분하여 여러 개 (메인 카테고리 외 추가 분류)\n- 형태: AI 타입 (콤마로 구분)\n- Tags: #으로 시작하는 태그\n\n주의사항:\n- 로고(URL) 필드에 이미지 URL 입력 시 자동으로 ai_logo에 저장됨\n- 서비스명(영문) 기준으로 중복 확인 후 업데이트\n- 배치 처리로 타임아웃 방지 및 성능 최적화'
+          description: '엑셀 업로드 시 주의사항:\n\n필드 설명:\n- id: AI 서비스 고유 ID (선택사항, 예: 00001, 00002) - ID가 있으면 해당 ID로 업데이트/생성\n- 서비스명(국문): 필수 필드\n- 서비스명(영문): 중복 확인 기준\n- 로고(URL): AI 서비스 로고 이미지 URL\n- 난이도: 초급/중급/고급 입력\n- Alive: Yes/No (서비스 활성 상태)\n- 표시위치: STEP_PICK 또는 빈값 (메인페이지 STEP PICK 섹션 표시)\n- NEW: Yes/No (신규 서비스 표시 - 카드에 NEW 뱃지 표시)\n- 메인 카테고리: 대표 카테고리 1개\n- 서브 카테고리: 콤마로 구분하여 여러 개 (메인 카테고리 외 추가 분류)\n- 형태: AI 타입 (콤마로 구분)\n- Tags: #으로 시작하는 태그\n- 유사 서비스: 줄바꿈으로 구분된 ID 목록 (예: 00002\n00003\n00005)\n\n주의사항:\n- id 컬럼이 있으면 ID 기준으로 업데이트, 없으면 서비스명 기준\n- 유사 서비스는 ID 기준으로 연결 (예: 00001, 00002 형태)\n- 로고(URL) 필드에 이미지 URL 입력 시 자동으로 ai_logo에 저장됨\n- 배치 처리로 타임아웃 방지 및 성능 최적화'
         }
       });
     } catch (error) {

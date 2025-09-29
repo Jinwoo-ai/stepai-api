@@ -26,7 +26,7 @@ const upload = multer({
 // 이미지 업로드 설정 (개선된 버전)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadPath = 'public/uploads/icons/';
+    const uploadPath = path.join(process.cwd(), 'public/uploads/icons/');
     // 디렉토리가 없으면 생성
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
@@ -136,8 +136,9 @@ router.post('/upload-icon', imageUpload.single('icon'), async (req, res) => {
 
     // multer가 이미 파일명을 생성했으므로 그대로 사용
     const fileName = req.file.filename;
-    // 상대 경로로 반환 (프론트에서 도메인 추가)
-    const fileUrl = `/uploads/icons/${fileName}`;
+    // 전체 URL로 반환
+    const baseUrl = process.env.BASE_URL || 'https://stepai-admin-production.up.railway.app';
+    const fileUrl = `${baseUrl}/uploads/icons/${fileName}`;
     
     res.json({
       success: true,
@@ -194,7 +195,7 @@ router.get('/admin-search', async (req, res) => {
     
     try {
       const [services] = await connection.execute<RowDataPacket[]>(
-        `SELECT s.id, s.ai_name, COALESCE(s.ai_name_en, '') as ai_name_en, s.ai_description, s.ai_logo, s.company_name, s.is_step_pick, s.is_new,
+        `SELECT s.id, s.ai_name, COALESCE(s.ai_name_en, '') as ai_name_en, s.ai_description, s.ai_logo, s.company_name, s.headquarters, s.is_step_pick, s.is_new,
                 c.id as category_id, c.category_name
          FROM ai_services s
          LEFT JOIN ai_service_categories ascat ON s.id = ascat.ai_service_id AND ascat.is_main_category = 1
@@ -206,20 +207,33 @@ router.get('/admin-search', async (req, res) => {
         [`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`]
       );
       
-      const result = services.map(service => ({
-        id: service.id,
-        ai_name: service.ai_name,
-        ai_name_en: service.ai_name_en,
-        ai_description: service.ai_description,
-        ai_logo: service.ai_logo,
-        company_name: service.company_name,
-        is_step_pick: service.is_step_pick,
-        is_new: service.is_new,
-        category: service.category_id ? {
-          id: service.category_id,
-          category_name: service.category_name
-        } : null
-      }));
+      const result = services.map(service => {
+        const headquarters = service.headquarters;
+        const baseUrl = process.env.BASE_URL || 'https://stepai-admin-production.up.railway.app';
+        let flag_icon = `${baseUrl}/uploads/icons/국가없음.png`;
+        if (headquarters) {
+          const flagPath = path.join(process.cwd(), 'public/uploads/icons', `${headquarters}.png`);
+          if (fs.existsSync(flagPath)) {
+            flag_icon = `${baseUrl}/uploads/icons/${headquarters}.png`;
+          }
+        }
+        
+        return {
+          id: service.id,
+          ai_name: service.ai_name,
+          ai_name_en: service.ai_name_en,
+          ai_description: service.ai_description,
+          ai_logo: service.ai_logo,
+          company_name: service.company_name,
+          is_step_pick: service.is_step_pick,
+          is_new: service.is_new,
+          flag_icon: flag_icon,
+          category: service.category_id ? {
+            id: service.category_id,
+            category_name: service.category_name
+          } : null
+        };
+      });
       
       res.json({ 
         success: true, 
@@ -290,7 +304,7 @@ router.get('/search', async (req, res) => {
           const placeholders = serviceIds.map(() => '?').join(',');
           
           const [services] = await connection.execute<RowDataPacket[]>(
-            `SELECT s.id, s.ai_name, COALESCE(s.ai_name_en, '') as ai_name_en, s.ai_description, s.ai_logo, s.company_name, s.is_step_pick, s.is_new,
+            `SELECT s.id, s.ai_name, COALESCE(s.ai_name_en, '') as ai_name_en, s.ai_description, s.ai_logo, s.company_name, s.headquarters, s.is_step_pick, s.is_new,
                     c.id as category_id, c.category_name
              FROM ai_services s
              LEFT JOIN ai_service_categories ascat ON s.id = ascat.ai_service_id AND ascat.is_main_category = 1
@@ -313,19 +327,32 @@ router.get('/search', async (req, res) => {
             service.categories = allCategories;
           }
           
-          result.ai_services = services.map(service => ({
-            id: service.id,
-            ai_name: service.ai_name,
-            ai_name_en: service.ai_name_en,
-            ai_description: service.ai_description,
-            ai_logo: service.ai_logo,
-            company_name: service.company_name,
-            is_step_pick: service.is_step_pick,
-            is_new: service.is_new,
-            category_id: service.category_id,
-            category_name: service.category_name,
-            categories: service.categories || []
-          }));
+          result.ai_services = services.map(service => {
+            const headquarters = service.headquarters;
+            const baseUrl = process.env.BASE_URL || 'https://stepai-admin-production.up.railway.app';
+            let flag_icon = `${baseUrl}/uploads/icons/국가없음.png`;
+            if (headquarters) {
+              const flagPath = path.join(process.cwd(), 'public/uploads/icons', `${headquarters}.png`);
+              if (fs.existsSync(flagPath)) {
+                flag_icon = `${baseUrl}/uploads/icons/${headquarters}.png`;
+              }
+            }
+            
+            return {
+              id: service.id,
+              ai_name: service.ai_name,
+              ai_name_en: service.ai_name_en,
+              ai_description: service.ai_description,
+              ai_logo: service.ai_logo,
+              company_name: service.company_name,
+              is_step_pick: service.is_step_pick,
+              is_new: service.is_new,
+              flag_icon: flag_icon,
+              category_id: service.category_id,
+              category_name: service.category_name,
+              categories: service.categories || []
+            };
+          });
         }
         
         // 비디오 조회
@@ -368,7 +395,7 @@ router.get('/search', async (req, res) => {
       
       try {
         const [services] = await connection.execute<RowDataPacket[]>(
-          `SELECT s.id, s.ai_name, COALESCE(s.ai_name_en, '') as ai_name_en, s.ai_description, s.ai_logo, s.company_name, s.is_step_pick, s.is_new,
+          `SELECT s.id, s.ai_name, COALESCE(s.ai_name_en, '') as ai_name_en, s.ai_description, s.ai_logo, s.company_name, s.headquarters, s.is_step_pick, s.is_new,
                   c.id as category_id, c.category_name
            FROM ai_services s
            LEFT JOIN ai_service_categories ascat ON s.id = ascat.ai_service_id AND ascat.is_main_category = 1
@@ -406,19 +433,32 @@ router.get('/search', async (req, res) => {
         
         const fallbackResult = {
           search_answer: `"${query}"에 대한 검색 결과입니다.`,
-          ai_services: services.map(service => ({
-            id: service.id,
-            ai_name: service.ai_name,
-            ai_name_en: service.ai_name_en,
-            ai_description: service.ai_description,
-            ai_logo: service.ai_logo,
-            company_name: service.company_name,
-            is_step_pick: service.is_step_pick,
-            is_new: service.is_new,
-            category_id: service.category_id,
-            category_name: service.category_name,
-            categories: service.categories || []
-          })),
+          ai_services: services.map(service => {
+            const headquarters = service.headquarters;
+            const baseUrl = process.env.BASE_URL || 'https://stepai-admin-production.up.railway.app';
+            let flag_icon = `${baseUrl}/uploads/icons/국가없음.png`;
+            if (headquarters) {
+              const flagPath = path.join(process.cwd(), 'public/uploads/icons', `${headquarters}.png`);
+              if (fs.existsSync(flagPath)) {
+                flag_icon = `${baseUrl}/uploads/icons/${headquarters}.png`;
+              }
+            }
+            
+            return {
+              id: service.id,
+              ai_name: service.ai_name,
+              ai_name_en: service.ai_name_en,
+              ai_description: service.ai_description,
+              ai_logo: service.ai_logo,
+              company_name: service.company_name,
+              is_step_pick: service.is_step_pick,
+              is_new: service.is_new,
+              flag_icon: flag_icon,
+              category_id: service.category_id,
+              category_name: service.category_name,
+              categories: service.categories || []
+            };
+          }),
           videos: videos
         };
         
@@ -673,6 +713,20 @@ router.get('/:id', async (req, res) => {
       );
       serviceData['contents'] = contents;
       
+      // flag_icon 추가
+      const headquarters = serviceData['headquarters'];
+      const baseUrl = process.env.BASE_URL || 'https://stepai-admin-production.up.railway.app';
+      if (headquarters) {
+        const flagPath = path.join(process.cwd(), 'public/uploads/icons', `${headquarters}.png`);
+        if (fs.existsSync(flagPath)) {
+          serviceData['flag_icon'] = `${baseUrl}/uploads/icons/${headquarters}.png`;
+        } else {
+          serviceData['flag_icon'] = `${baseUrl}/uploads/icons/국가없음.png`;
+        }
+      } else {
+        serviceData['flag_icon'] = `${baseUrl}/uploads/icons/국가없음.png`;
+      }
+      
       res.json({
         success: true,
         data: serviceData
@@ -915,6 +969,20 @@ router.get('/', async (req, res) => {
           [service['id']]
         );
         serviceData['contents'] = contents;
+        
+        // flag_icon 추가
+        const headquarters = serviceData['headquarters'];
+        const baseUrl = process.env.BASE_URL || 'https://stepai-admin-production.up.railway.app';
+        if (headquarters) {
+          const flagPath = path.join(process.cwd(), 'public/uploads/icons', `${headquarters}.png`);
+          if (fs.existsSync(flagPath)) {
+            serviceData['flag_icon'] = `${baseUrl}/uploads/icons/${headquarters}.png`;
+          } else {
+            serviceData['flag_icon'] = `${baseUrl}/uploads/icons/국가없음.png`;
+          }
+        } else {
+          serviceData['flag_icon'] = `${baseUrl}/uploads/icons/국가없음.png`;
+        }
         
         servicesWithCategories.push(serviceData);
       }

@@ -275,6 +275,7 @@ GET /api/homepage-settings/trends/{sectionId}/services
       "company_name": "Anthropic",
       "is_step_pick": false,
       "is_new": true,
+      "flag_icon": "https://stepai-admin-production.up.railway.app/uploads/icons/미국.png",
       "category_name": "문서·글쓰기",
       "categories": [
         {
@@ -390,6 +391,7 @@ GET /api/ai-services/{id}?include_categories=true
     "company_name": "OpenAI",
     "company_name_en": "OpenAI",
     "headquarters": "미국",
+    "flag_icon": "https://stepai-admin-production.up.railway.app/uploads/icons/미국.png",
     "pricing_info": "무료 / 월 $20",
     "difficulty_level": "beginner",
     "usage_availability": "웹, 모바일 앱",
@@ -428,6 +430,9 @@ GET /api/ai-services/{id}?include_categories=true
   }
 }
 ```
+
+**새로 추가된 필드**:
+- `flag_icon`: 본사 국가의 국기 아이콘 URL. `headquarters` 필드 값을 기반으로 `/public/uploads/icons/{headquarters}.png` 파일이 존재하면 해당 URL을 반환하고, 없으면 `국가없음.png`를 반환합니다.
 
 ## 🎬 영상 페이지 API
 
@@ -503,6 +508,7 @@ GET /api/ai-services/search?q=검색어
         "company_name": "(주)로앤컴퍼니",
         "is_step_pick": false,
         "is_new": false,
+        "flag_icon": "https://stepai-admin-production.up.railway.app/uploads/icons/대한민국.png",
         "category_id": 1,
         "category_name": "법률·전문서비스",
         "categories": [
