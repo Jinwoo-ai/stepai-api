@@ -299,6 +299,19 @@ router.get('/search', async (req, res) => {
             [...serviceIds, ...serviceIds]
           );
           
+          // 각 서비스의 모든 카테고리 정보 조회
+          for (const service of services) {
+            const [allCategories] = await connection.execute<RowDataPacket[]>(
+              `SELECT c.id, c.category_name, ascat.is_main_category
+               FROM ai_service_categories ascat
+               INNER JOIN categories c ON ascat.category_id = c.id
+               WHERE ascat.ai_service_id = ?
+               ORDER BY ascat.is_main_category DESC, c.category_name`,
+              [service.id]
+            );
+            service.categories = allCategories;
+          }
+          
           result.ai_services = services.map(service => ({
             id: service.id,
             ai_name: service.ai_name,
@@ -308,10 +321,9 @@ router.get('/search', async (req, res) => {
             company_name: service.company_name,
             is_step_pick: service.is_step_pick,
             is_new: service.is_new,
-            category: service.category_id ? {
-              id: service.category_id,
-              category_name: service.category_name
-            } : null
+            category_id: service.category_id,
+            category_name: service.category_name,
+            categories: service.categories || []
           }));
         }
         
@@ -367,6 +379,19 @@ router.get('/search', async (req, res) => {
           [`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`]
         );
         
+        // 각 서비스의 모든 카테고리 정보 조회
+        for (const service of services) {
+          const [allCategories] = await connection.execute<RowDataPacket[]>(
+            `SELECT c.id, c.category_name, ascat.is_main_category
+             FROM ai_service_categories ascat
+             INNER JOIN categories c ON ascat.category_id = c.id
+             WHERE ascat.ai_service_id = ?
+             ORDER BY ascat.is_main_category DESC, c.category_name`,
+            [service.id]
+          );
+          service.categories = allCategories;
+        }
+        
         // 비디오 검색
         const [videos] = await connection.execute<RowDataPacket[]>(
           `SELECT id, video_title, video_description, thumbnail_url, duration, view_count, video_url
@@ -389,10 +414,9 @@ router.get('/search', async (req, res) => {
             company_name: service.company_name,
             is_step_pick: service.is_step_pick,
             is_new: service.is_new,
-            category: service.category_id ? {
-              id: service.category_id,
-              category_name: service.category_name
-            } : null
+            category_id: service.category_id,
+            category_name: service.category_name,
+            categories: service.categories || []
           })),
           videos: videos
         };
@@ -532,9 +556,13 @@ router.get('/:id', async (req, res) => {
     const connection = await pool.getConnection();
     
     try {
-      // AI 서비스 기본 정보 조회
+      // AI 서비스 기본 정보 조회 (대표 카테고리 포함)
       const [services] = await connection.execute<RowDataPacket[]>(
-        'SELECT * FROM ai_services WHERE id = ? AND deleted_at IS NULL',
+        `SELECT s.*, mc.id as main_category_id, mc.category_name as main_category_name
+         FROM ai_services s
+         LEFT JOIN ai_service_categories ascat ON s.id = ascat.ai_service_id AND ascat.is_main_category = 1
+         LEFT JOIN categories mc ON ascat.category_id = mc.id
+         WHERE s.id = ? AND s.deleted_at IS NULL`,
         [id]
       );
       
@@ -547,6 +575,10 @@ router.get('/:id', async (req, res) => {
       
       let serviceData = { ...services[0] };
       
+      // 대표 카테고리 정보 추가
+      serviceData['category_id'] = serviceData['main_category_id'];
+      serviceData['category_name'] = serviceData['main_category_name'];
+      
       // 카테고리 정보 포함
       if (include_categories) {
         const [categories] = await connection.execute<RowDataPacket[]>(
@@ -556,6 +588,17 @@ router.get('/:id', async (req, res) => {
            INNER JOIN ai_service_categories ascat ON c.id = ascat.category_id 
            LEFT JOIN categories p ON c.parent_id = p.id
            WHERE ascat.ai_service_id = ?`,
+          [id]
+        );
+        serviceData['categories'] = categories;
+      } else {
+        // include_categories가 false인 경우도 모든 카테고리 정보 제공
+        const [categories] = await connection.execute<RowDataPacket[]>(
+          `SELECT c.id, c.category_name, ascat.is_main_category
+           FROM ai_service_categories ascat
+           INNER JOIN categories c ON ascat.category_id = c.id
+           WHERE ascat.ai_service_id = ?
+           ORDER BY ascat.is_main_category DESC, c.category_name`,
           [id]
         );
         serviceData['categories'] = categories;
@@ -758,8 +801,12 @@ router.get('/', async (req, res) => {
       
       const [services] = await connection.execute<RowDataPacket[]>(
         `SELECT DISTINCT ai_services.*, 
-                COALESCE(ai_services.ai_name_en, '') as ai_name_en
+                COALESCE(ai_services.ai_name_en, '') as ai_name_en,
+                mc.id as main_category_id,
+                mc.category_name as main_category_name
          FROM ai_services 
+         LEFT JOIN ai_service_categories main_ascat ON ai_services.id = main_ascat.ai_service_id AND main_ascat.is_main_category = 1
+         LEFT JOIN categories mc ON main_ascat.category_id = mc.id
          ${category_id && !sort ? 'LEFT JOIN ai_service_category_display_order cdo ON ai_services.id = cdo.ai_service_id AND cdo.category_id = ?' : ''}
          WHERE ${whereClause} 
          ORDER BY ${orderByClause}
@@ -772,6 +819,10 @@ router.get('/', async (req, res) => {
       for (const service of services) {
         let serviceData = { ...service };
         
+        // 대표 카테고리 정보 추가
+        serviceData['category_id'] = service['main_category_id'];
+        serviceData['category_name'] = service['main_category_name'];
+        
         if (include_categories) {
           const [categories] = await connection.execute<RowDataPacket[]>(
             `SELECT c.id, c.category_name, c.parent_id, ascat.is_main_category,
@@ -780,6 +831,17 @@ router.get('/', async (req, res) => {
              INNER JOIN ai_service_categories ascat ON c.id = ascat.category_id 
              LEFT JOIN categories p ON c.parent_id = p.id
              WHERE ascat.ai_service_id = ?`,
+            [service['id']]
+          );
+          serviceData['categories'] = categories;
+        } else {
+          // include_categories가 false인 경우도 모든 카테고리 정보 제공
+          const [categories] = await connection.execute<RowDataPacket[]>(
+            `SELECT c.id, c.category_name, ascat.is_main_category
+             FROM ai_service_categories ascat
+             INNER JOIN categories c ON ascat.category_id = c.id
+             WHERE ascat.ai_service_id = ?
+             ORDER BY ascat.is_main_category DESC, c.category_name`,
             [service['id']]
           );
           serviceData['categories'] = categories;

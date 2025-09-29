@@ -401,6 +401,8 @@ router.get('/trends/:sectionId/services', async (req, res) => {
         ais.created_at,
         ais.is_new,
         c.category_name,
+        mc.id as main_category_id,
+        mc.category_name as main_category_name,
         GROUP_CONCAT(DISTINCT t.tag_name) as tags
     `;
     
@@ -414,6 +416,8 @@ router.get('/trends/:sectionId/services', async (req, res) => {
       FROM trend_section_services tss
       JOIN ai_services ais ON tss.ai_service_id = ais.id
       LEFT JOIN categories c ON tss.category_id = c.id
+      LEFT JOIN ai_service_categories ascat ON ais.id = ascat.ai_service_id AND ascat.is_main_category = 1
+      LEFT JOIN categories mc ON ascat.category_id = mc.id
       LEFT JOIN ai_service_tags ast ON ais.id = ast.ai_service_id
       LEFT JOIN tags t ON ast.tag_id = t.id
     `;
@@ -443,7 +447,7 @@ router.get('/trends/:sectionId/services', async (req, res) => {
     query += `
       GROUP BY tss.id, tss.ai_service_id, tss.category_id, tss.display_order, tss.is_featured, tss.is_active, 
                ais.ai_name, ais.ai_description, ais.ai_logo, ais.company_name, ais.is_step_pick, ais.is_new, 
-               c.category_name`;
+               c.category_name, mc.id, mc.category_name`;
     
     if (userId) {
       query += `, uf.id`;
@@ -455,14 +459,29 @@ router.get('/trends/:sectionId/services', async (req, res) => {
 
     const [rows] = await pool.execute<RowDataPacket[]>(query, params);
     
-    // tags 필드를 배열로 변환
-    const processedRows = rows.map(row => ({
-      ...row,
-      tags: row.tags ? row.tags.split(',') : [],
-      is_new: !!row.is_new,
-      is_bookmarked: userId ? !!row.is_bookmarked : undefined,
-      created_at: undefined // 클라이언트에서는 숨김
-    }));
+    // 각 서비스의 모든 카테고리 정보 조회 및 처리
+    const processedRows = [];
+    for (const row of rows) {
+      const [allCategories] = await pool.execute<RowDataPacket[]>(
+        `SELECT c.id, c.category_name, ascat.is_main_category
+         FROM ai_service_categories ascat
+         INNER JOIN categories c ON ascat.category_id = c.id
+         WHERE ascat.ai_service_id = ?
+         ORDER BY ascat.is_main_category DESC, c.category_name`,
+        [row.ai_service_id]
+      );
+      
+      processedRows.push({
+        ...row,
+        category_id: row.main_category_id,
+        category_name: row.main_category_name,
+        categories: allCategories,
+        tags: row.tags ? row.tags.split(',') : [],
+        is_new: !!row.is_new,
+        is_bookmarked: userId ? !!row.is_bookmarked : undefined,
+        created_at: undefined // 클라이언트에서는 숨김
+      });
+    }
     
     res.json({ success: true, data: processedRows });
   } catch (error) {
@@ -732,10 +751,16 @@ router.get('/', async (req, res) => {
         ais.ai_description,
         ais.ai_logo,
         ais.company_name,
-        c.category_name
+        ais.is_step_pick,
+        ais.is_new,
+        c.category_name,
+        mc.id as main_category_id,
+        mc.category_name as main_category_name
       FROM homepage_step_pick_services hsp
       JOIN ai_services ais ON hsp.ai_service_id = ais.id
       LEFT JOIN categories c ON hsp.category_id = c.id
+      LEFT JOIN ai_service_categories ascat ON ais.id = ascat.ai_service_id AND ascat.is_main_category = 1
+      LEFT JOIN categories mc ON ascat.category_id = mc.id
       WHERE hsp.is_active = TRUE
     `;
     
@@ -748,6 +773,21 @@ router.get('/', async (req, res) => {
     stepPickQuery += ` ORDER BY hsp.category_id ASC, hsp.display_order ASC`;
     
     const [stepPickResult] = await pool.execute<RowDataPacket[]>(stepPickQuery, stepPickParams);
+    
+    // 각 STEP PICK 서비스의 모든 카테고리 정보 조회
+    for (const service of stepPickResult) {
+      const [allCategories] = await pool.execute<RowDataPacket[]>(
+        `SELECT c.id, c.category_name, ascat.is_main_category
+         FROM ai_service_categories ascat
+         INNER JOIN categories c ON ascat.category_id = c.id
+         WHERE ascat.ai_service_id = ?
+         ORDER BY ascat.is_main_category DESC, c.category_name`,
+        [service.ai_service_id]
+      );
+      service.categories = allCategories;
+      service.category_id = service.main_category_id;
+      service.category_name = service.main_category_name;
+    }
     
     // 4. 트렌드 섹션 데이터 조회
     const [trendsResult] = await pool.execute<RowDataPacket[]>(`
