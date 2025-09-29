@@ -26,17 +26,24 @@ export class InquiryService {
         inquiry_type: data.inquiry_type || 'general',
         subject: data.subject || '',
         message: data.message || '',
-        attachment_url: data.attachment_url === '$undefined' ? null : data.attachment_url
+        attachment_url: data.attachment_url === '$undefined' || !data.attachment_url ? null : data.attachment_url
       };
+
+      const params = [
+        cleanData.name, 
+        cleanData.email, 
+        cleanData.phone, 
+        cleanData.inquiry_type,
+        cleanData.subject, 
+        cleanData.message, 
+        cleanData.attachment_url
+      ].map(param => param === undefined ? null : param);
 
       const [result] = await connection.execute(
         `INSERT INTO inquiries (
           name, email, phone, inquiry_type, subject, message, attachment_url
         ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          cleanData.name, cleanData.email, cleanData.phone, cleanData.inquiry_type,
-          cleanData.subject, cleanData.message, cleanData.attachment_url
-        ]
+        params
       );
 
       const insertId = (result as any).insertId;

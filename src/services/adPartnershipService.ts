@@ -25,12 +25,12 @@ export class AdPartnershipService {
         contact_email: data.contact_email || '',
         contact_phone: data.contact_phone || null,
         partnership_type: data.partnership_type || 'advertisement',
-        budget_range: data.budget_range === 'Not specified' ? null : data.budget_range,
-        campaign_period: data.campaign_period === 'Not specified' ? null : data.campaign_period,
-        target_audience: data.target_audience === 'Not specified' ? null : data.target_audience,
+        budget_range: data.budget_range === 'Not specified' || !data.budget_range ? null : data.budget_range,
+        campaign_period: data.campaign_period === 'Not specified' || !data.campaign_period ? null : data.campaign_period,
+        target_audience: data.target_audience === 'Not specified' || !data.target_audience ? null : data.target_audience,
         campaign_description: data.campaign_description || null,
         additional_requirements: data.additional_requirements || null,
-        attachment_url: data.attachment_url === '$undefined' ? null : data.attachment_url
+        attachment_url: data.attachment_url === '$undefined' || !data.attachment_url ? null : data.attachment_url
       };
 
       const [result] = await connection.execute(
