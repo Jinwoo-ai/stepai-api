@@ -97,8 +97,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { category_name, category_description, category_icon, category_status } = req.body;
-
+    
     if (isNaN(id)) {
       return res.status(400).json({
         success: false,
@@ -110,11 +109,31 @@ router.put('/:id', async (req, res) => {
     const connection = await pool.getConnection();
     
     try {
-      const [result] = await connection.execute<ResultSetHeader>(`
-        UPDATE categories 
-        SET category_name = ?, category_description = ?, category_icon = ?, category_status = ?, updated_at = NOW()
-        WHERE id = ?
-      `, [category_name, category_description || null, category_icon || null, category_status, id]);
+      // 동적 업데이트 쿼리 생성
+      const updateFields = [];
+      const updateValues = [];
+      
+      Object.keys(req.body).forEach(key => {
+        if (['category_name', 'category_description', 'category_icon', 'category_status', 'parent_id', 'category_order'].includes(key)) {
+          updateFields.push(`${key} = ?`);
+          updateValues.push(req.body[key]);
+        }
+      });
+      
+      if (updateFields.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: '수정할 필드가 없습니다.'
+        });
+      }
+      
+      updateFields.push('updated_at = NOW()');
+      updateValues.push(id);
+      
+      const [result] = await connection.execute<ResultSetHeader>(
+        `UPDATE categories SET ${updateFields.join(', ')} WHERE id = ?`,
+        updateValues
+      );
 
       if (result.affectedRows === 0) {
         return res.status(404).json({
@@ -134,7 +153,8 @@ router.put('/:id', async (req, res) => {
     console.error('Error updating category:', error);
     res.status(500).json({
       success: false,
-      error: '카테고리 수정 중 오류가 발생했습니다.'
+      error: '카테고리 수정 중 오류가 발생했습니다.',
+      details: error.message
     });
   }
 });
