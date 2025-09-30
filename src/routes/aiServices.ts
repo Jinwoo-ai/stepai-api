@@ -220,6 +220,7 @@ router.get('/admin-search', async (req, res) => {
         
         return {
           id: service.id,
+          ai_service_id: service.id,
           ai_name: service.ai_name,
           ai_name_en: service.ai_name_en,
           ai_description: service.ai_description,
@@ -340,6 +341,7 @@ router.get('/search', async (req, res) => {
             
             return {
               id: service.id,
+              ai_service_id: service.id,
               ai_name: service.ai_name,
               ai_name_en: service.ai_name_en,
               ai_description: service.ai_description,
@@ -386,7 +388,17 @@ router.get('/search', async (req, res) => {
         statusText: webhookError.response?.statusText,
         data: webhookError.response?.data,
         url: webhookUrl,
-        query: query
+        query: query,
+        requestPayload: {
+          method: 'GET',
+          url: webhookUrl,
+          params: { user_query: query },
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'stepai-search-api/1.0'
+          },
+          timeout: 30000
+        }
       });
       
       // 웹훅 실패 시 기존 DB 검색으로 폴백
@@ -446,6 +458,7 @@ router.get('/search', async (req, res) => {
             
             return {
               id: service.id,
+              ai_service_id: service.id,
               ai_name: service.ai_name,
               ai_name_en: service.ai_name_en,
               ai_description: service.ai_description,
@@ -745,6 +758,9 @@ router.get('/:id', async (req, res) => {
         serviceData['is_bookmarked'] = bookmarkResult.length > 0;
       }
       
+      // ai_service_id 필드 추가
+      serviceData['ai_service_id'] = serviceData['id'];
+      
       res.json({
         success: true,
         data: serviceData
@@ -1037,6 +1053,9 @@ router.get('/', async (req, res) => {
         if (userId) {
           serviceData['is_bookmarked'] = !!service['is_bookmarked'];
         }
+        
+        // ai_service_id 필드 추가
+        serviceData['ai_service_id'] = serviceData['id'];
         
         servicesWithCategories.push(serviceData);
       }

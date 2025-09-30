@@ -48,7 +48,21 @@ router.post('/services/:serviceId', async (req, res) => {
       return res.status(401).json({ success: false, error: '로그인이 필요합니다.' });
     }
 
+    if (!serviceId || isNaN(serviceId)) {
+      return res.status(400).json({ success: false, error: '유효하지 않은 서비스 ID입니다.' });
+    }
+
     const pool = getDatabaseConnection();
+    
+    // AI 서비스가 존재하는지 확인
+    const [serviceExists] = await pool.execute<RowDataPacket[]>(
+      'SELECT id FROM ai_services WHERE id = ? AND ai_status = "active"',
+      [serviceId]
+    );
+
+    if (serviceExists.length === 0) {
+      return res.status(404).json({ success: false, error: '존재하지 않는 AI 서비스입니다.' });
+    }
     
     // 이미 등록되어 있는지 확인
     const [existing] = await pool.execute<RowDataPacket[]>(
@@ -81,6 +95,10 @@ router.delete('/services/:serviceId', async (req, res) => {
 
     if (!userId) {
       return res.status(401).json({ success: false, error: '로그인이 필요합니다.' });
+    }
+
+    if (!serviceId || isNaN(serviceId)) {
+      return res.status(400).json({ success: false, error: '유효하지 않은 서비스 ID입니다.' });
     }
 
     const pool = getDatabaseConnection();
@@ -143,7 +161,21 @@ router.post('/videos/:videoId', async (req, res) => {
       return res.status(401).json({ success: false, error: '로그인이 필요합니다.' });
     }
 
+    if (!videoId || isNaN(videoId)) {
+      return res.status(400).json({ success: false, error: '유효하지 않은 영상 ID입니다.' });
+    }
+
     const pool = getDatabaseConnection();
+    
+    // AI 영상이 존재하는지 확인
+    const [videoExists] = await pool.execute<RowDataPacket[]>(
+      'SELECT id FROM ai_videos WHERE id = ? AND video_status = "active"',
+      [videoId]
+    );
+
+    if (videoExists.length === 0) {
+      return res.status(404).json({ success: false, error: '존재하지 않는 AI 영상입니다.' });
+    }
     
     // 이미 등록되어 있는지 확인
     const [existing] = await pool.execute<RowDataPacket[]>(
@@ -176,6 +208,10 @@ router.delete('/videos/:videoId', async (req, res) => {
 
     if (!userId) {
       return res.status(401).json({ success: false, error: '로그인이 필요합니다.' });
+    }
+
+    if (!videoId || isNaN(videoId)) {
+      return res.status(400).json({ success: false, error: '유효하지 않은 영상 ID입니다.' });
     }
 
     const pool = getDatabaseConnection();

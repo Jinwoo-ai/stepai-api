@@ -648,11 +648,36 @@ POST /api/my-picks/services/{serviceId}
 **Headers**:
 - `user-id`: 사용자 ID (필수)
 
+**Path Parameters**:
+- `serviceId`: AI 서비스 ID (필수, 숫자)
+
 **Response**:
 ```json
 {
   "success": true,
   "message": "관심 서비스로 등록되었습니다."
+}
+```
+
+**Error Response**:
+```json
+{
+  "success": false,
+  "error": "유효하지 않은 서비스 ID입니다."
+}
+```
+
+```json
+{
+  "success": false,
+  "error": "존재하지 않는 AI 서비스입니다."
+}
+```
+
+```json
+{
+  "success": false,
+  "error": "이미 관심 등록된 서비스입니다."
 }
 ```
 
@@ -666,11 +691,29 @@ DELETE /api/my-picks/services/{serviceId}
 **Headers**:
 - `user-id`: 사용자 ID (필수)
 
+**Path Parameters**:
+- `serviceId`: AI 서비스 ID (필수, 숫자)
+
 **Response**:
 ```json
 {
   "success": true,
   "message": "관심 서비스에서 제거되었습니다."
+}
+```
+
+**Error Response**:
+```json
+{
+  "success": false,
+  "error": "유효하지 않은 서비스 ID입니다."
+}
+```
+
+```json
+{
+  "success": false,
+  "error": "관심 등록되지 않은 서비스입니다."
 }
 ```
 
@@ -713,11 +756,36 @@ POST /api/my-picks/videos/{videoId}
 **Headers**:
 - `user-id`: 사용자 ID (필수)
 
+**Path Parameters**:
+- `videoId`: AI 영상 ID (필수, 숫자)
+
 **Response**:
 ```json
 {
   "success": true,
   "message": "관심 영상으로 등록되었습니다."
+}
+```
+
+**Error Response**:
+```json
+{
+  "success": false,
+  "error": "유효하지 않은 영상 ID입니다."
+}
+```
+
+```json
+{
+  "success": false,
+  "error": "존재하지 않는 AI 영상입니다."
+}
+```
+
+```json
+{
+  "success": false,
+  "error": "이미 관심 등록된 영상입니다."
 }
 ```
 
@@ -731,11 +799,29 @@ DELETE /api/my-picks/videos/{videoId}
 **Headers**:
 - `user-id`: 사용자 ID (필수)
 
+**Path Parameters**:
+- `videoId`: AI 영상 ID (필수, 숫자)
+
 **Response**:
 ```json
 {
   "success": true,
   "message": "관심 영상에서 제거되었습니다."
+}
+```
+
+**Error Response**:
+```json
+{
+  "success": false,
+  "error": "유효하지 않은 영상 ID입니다."
+}
+```
+
+```json
+{
+  "success": false,
+  "error": "관심 등록되지 않은 영상입니다."
 }
 ```
 
