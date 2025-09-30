@@ -435,6 +435,7 @@ GET /api/ai-services/{id}?include_categories=true
       {
         "id": 2,
         "ai_name": "Claude",
+        "ai_name_en": "Claude",
         "ai_logo": "/uploads/icons/claude.png",
         "company_name": "Anthropic"
       }

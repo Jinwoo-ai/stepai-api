@@ -716,7 +716,7 @@ router.get('/:id', async (req, res) => {
       
       // 유사 서비스 정보 포함
       const [similarServices] = await connection.execute<RowDataPacket[]>(
-        `SELECT s.id, s.ai_name, s.ai_logo, s.company_name
+        `SELECT s.id, s.ai_name, COALESCE(s.ai_name_en, '') as ai_name_en, s.ai_logo, s.company_name
          FROM ai_services s
          INNER JOIN ai_service_similar_services ass ON s.id = ass.similar_service_id
          WHERE ass.ai_service_id = ? AND s.deleted_at IS NULL
@@ -1016,7 +1016,7 @@ router.get('/', async (req, res) => {
         
         // 유사 서비스 정보 포함
         const [similarServices] = await connection.execute<RowDataPacket[]>(
-          `SELECT s.id, s.ai_name, s.ai_logo, s.company_name
+          `SELECT s.id, s.ai_name, COALESCE(s.ai_name_en, '') as ai_name_en, s.ai_logo, s.company_name
            FROM ai_services s
            INNER JOIN ai_service_similar_services ass ON s.id = ass.similar_service_id
            WHERE ass.ai_service_id = ?
