@@ -21,11 +21,11 @@ router.get('/', async (req, res) => {
       try {
         const pool = getDatabaseConnection();
         const [userResult] = await pool.execute<RowDataPacket[]>(
-          'SELECT id FROM users WHERE access_token = ?',
+          'SELECT user_id FROM access_tokens WHERE token = ? AND expires_at > NOW()',
           [token]
         );
         if (userResult.length > 0) {
-          userId = userResult[0].id;
+          userId = userResult[0].user_id;
         }
       } catch (error) {
         console.log('사용자 토큰 조회 실패:', error.message);
@@ -478,11 +478,11 @@ router.get('/:id', async (req, res) => {
       try {
         const pool = getDatabaseConnection();
         const [userResult] = await pool.execute<RowDataPacket[]>(
-          'SELECT id FROM users WHERE access_token = ?',
+          'SELECT user_id FROM access_tokens WHERE token = ? AND expires_at > NOW()',
           [token]
         );
         if (userResult.length > 0) {
-          userId = userResult[0].id;
+          userId = userResult[0].user_id;
         }
       } catch (error) {
         console.log('사용자 토큰 조회 실패:', error.message);

@@ -616,11 +616,11 @@ router.get('/:id', async (req, res) => {
       // 토큰으로 사용자 ID 조회
       try {
         const [userResult] = await connection.execute<RowDataPacket[]>(
-          'SELECT id FROM users WHERE access_token = ?',
+          'SELECT user_id FROM access_tokens WHERE token = ? AND expires_at > NOW()',
           [token]
         );
         if (userResult.length > 0) {
-          userId = userResult[0].id;
+          userId = userResult[0].user_id;
         }
       } catch (error) {
         console.log('사용자 토큰 조회 실패:', error.message);
@@ -807,17 +807,22 @@ router.get('/', async (req, res) => {
   let userId = null;
   if (req.headers.authorization) {
     const token = req.headers.authorization.replace('Bearer ', '');
+    console.log('Token received:', token);
     // 토큰으로 사용자 ID 조회
     try {
       const pool = getDatabaseConnection();
       const connection = await pool.getConnection();
       try {
         const [userResult] = await connection.execute<RowDataPacket[]>(
-          'SELECT id FROM users WHERE access_token = ?',
+          'SELECT user_id FROM access_tokens WHERE token = ? AND expires_at > NOW()',
           [token]
         );
+        console.log('User query result:', userResult);
         if (userResult.length > 0) {
-          userId = userResult[0].id;
+          userId = userResult[0].user_id;
+          console.log('Found userId:', userId);
+        } else {
+          console.log('No user found with this token');
         }
       } finally {
         connection.release();
@@ -1076,6 +1081,9 @@ router.get('/', async (req, res) => {
         // 북마크 정보 추가
         if (userId) {
           serviceData['is_bookmarked'] = !!service['is_bookmarked'];
+          console.log(`Service ${service.id} bookmark status:`, serviceData['is_bookmarked']);
+        } else {
+          console.log('No userId, skipping bookmark check');
         }
         
         // ai_service_id 필드 추가
