@@ -188,6 +188,8 @@ router.get('/step-pick', async (req, res) => {
         ais.ai_description,
         ais.ai_logo,
         ais.company_name,
+        ais.is_step_pick,
+        ais.is_new,
         c.category_name`;
     
     if (userId) {
@@ -225,6 +227,7 @@ router.get('/step-pick', async (req, res) => {
     // 북마크 정보 처리
     const processedRows = rows.map(row => ({
       ...row,
+      is_new: !!row.is_new,
       is_bookmarked: userId ? !!row.is_bookmarked : undefined
     }));
     

@@ -48,7 +48,8 @@ router.get('/available-services', async (req, res) => {
         ais.company_name,
         ais.pricing_info,
         ais.difficulty_level,
-        ais.is_step_pick
+        ais.is_step_pick,
+        ais.is_new
       FROM ai_services ais
       WHERE ais.ai_status = 'active'
         AND ais.id NOT IN (
@@ -146,7 +147,8 @@ router.get('/:categoryId', async (req, res) => {
         ais.company_name,
         ais.pricing_info,
         ais.difficulty_level,
-        ais.is_step_pick
+        ais.is_step_pick,
+        ais.is_new
       FROM ai_service_category_display_order asdo
       JOIN ai_services ais ON asdo.ai_service_id = ais.id
       WHERE asdo.category_id = ? AND ais.ai_status = 'active'

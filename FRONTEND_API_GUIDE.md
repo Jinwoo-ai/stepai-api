@@ -309,6 +309,8 @@ GET /api/homepage-settings/trends/{sectionId}/services
 - `tags`: AI 서비스에 연결된 태그 목록 (배열)
 - `is_bookmarked`: 로그인된 사용자의 경우만 포함, `user_favorite_services` 테이블 기반
 
+**중요**: 모든 AI 서비스 응답에는 `is_step_pick`, `is_new`, `is_bookmarked` (로그인 시), `tags` 필드가 포함됩니다.
+
 ## 📂 카테고리 페이지 API
 
 ### 1. 카테고리 목록 조회
@@ -362,6 +364,8 @@ GET /api/ai-services?category_id=1&ai_status=active&include_categories=true&page
 - `ai_type`: AI 타입 필터 (WEB, MOB, API, DES, EXT)
 - `difficulty_level`: 난이도 필터 (beginner, intermediate, advanced) - 콤마로 구분하여 다중 선택 가능
 - `nationality`: 국가별 필터 (domestic, overseas)
+- `is_free`: 무료/유료 필터 (true: 무료 서비스만, false: 유료 서비스만)
+- `is_new`: 신규 서비스 필터 (true: 신규 서비스만, false: 기존 서비스만)
 - `sort`: 정렬 방식 (popular, latest, name)
 
 **필터 옵션 설명**:
@@ -377,6 +381,12 @@ GET /api/ai-services?category_id=1&ai_status=active&include_categories=true&page
 - `nationality`:
   - `domestic`: 국내 (한국 기업 또는 한국어 지원 우선)
   - `overseas`: 해외 (외국 기업 또는 영어 기반 서비스)
+- `is_free`:
+  - `true`: 무료 서비스만 ("무료" 가격 모델이 포함된 서비스)
+  - `false`: 유료 서비스만 ("무료" 가격 모델이 없는 서비스)
+- `is_new`:
+  - `true`: 신규 서비스만 (관리자가 신규로 표시한 서비스)
+  - `false`: 기존 서비스만 (신규가 아닌 서비스)
 
 ## 🤖 AI 서비스 상세 페이지 API
 
@@ -2068,7 +2078,7 @@ GET /
 
 ### React에서 API 호출 예시
 ```javascript
-// AI 서비스 목록 조회
+// AI 서비스 목록 조회 (기본)
 const fetchAIServices = async () => {
   try {
     const response = await fetch('/api/ai-services?page=1&limit=20&include_categories=true');
@@ -2083,19 +2093,115 @@ const fetchAIServices = async () => {
   }
 };
 
-// 영상 상세 조회
-const fetchVideoDetail = async (id) => {
+// 무료 서비스만 조회
+const fetchFreeServices = async () => {
   try {
-    const response = await fetch(`/api/ai-videos/${id}`);
+    const response = await fetch('/api/ai-services?is_free=true&page=1&limit=20');
     const data = await response.json();
     
     if (data.success) {
+      setServices(data.data.data);
+    }
+  } catch (error) {
+    console.error('무료 서비스 조회 실패:', error);
+  }
+};
+
+// 신규 서비스만 조회
+const fetchNewServices = async () => {
+  try {
+    const response = await fetch('/api/ai-services?is_new=true&page=1&limit=20');
+    const data = await response.json();
+    
+    if (data.success) {
+      setServices(data.data.data);
+    }
+  } catch (error) {
+    console.error('신규 서비스 조회 실패:', error);
+  }
+};
+
+// 로그인된 사용자의 북마크 정보 포함 조회
+const fetchServicesWithBookmarks = async (userId) => {
+  try {
+    const response = await fetch('/api/ai-services?page=1&limit=20', {
+      headers: {
+        'Authorization': `Bearer ${userId}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    
+    if (data.success) {
+      // data.data.data 배열의 각 서비스에 is_bookmarked 필드가 포함됨
+      setServices(data.data.data);
+    }
+  } catch (error) {
+    console.error('북마크 정보 포함 조회 실패:', error);
+  }
+};
+
+// 영상 상세 조회 (북마크 정보 포함)
+const fetchVideoDetail = async (id, userId = null) => {
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (userId) {
+      headers['Authorization'] = `Bearer ${userId}`;
+    }
+    
+    const response = await fetch(`/api/ai-videos/${id}`, { headers });
+    const data = await response.json();
+    
+    if (data.success) {
+      // userId가 있으면 is_bookmarked 필드가 포함됨
       setVideo(data.data);
     }
   } catch (error) {
     console.error('영상 조회 실패:', error);
   }
 };
+
+// 복합 필터 조회 예시
+const fetchFilteredServices = async (filters) => {
+  try {
+    const params = new URLSearchParams();
+    
+    // 기본 파라미터
+    params.append('page', filters.page || 1);
+    params.append('limit', filters.limit || 20);
+    
+    // 필터 파라미터
+    if (filters.category_id) params.append('category_id', filters.category_id);
+    if (filters.search) params.append('search', filters.search);
+    if (filters.is_free !== undefined) params.append('is_free', filters.is_free);
+    if (filters.is_new !== undefined) params.append('is_new', filters.is_new);
+    if (filters.difficulty_level) params.append('difficulty_level', filters.difficulty_level);
+    if (filters.nationality) params.append('nationality', filters.nationality);
+    if (filters.sort) params.append('sort', filters.sort);
+    
+    const response = await fetch(`/api/ai-services?${params.toString()}`);
+    const data = await response.json();
+    
+    if (data.success) {
+      setServices(data.data.data);
+      setPagination(data.data.pagination);
+    }
+  } catch (error) {
+    console.error('필터링된 서비스 조회 실패:', error);
+  }
+};
+
+// 사용 예시
+// fetchFilteredServices({
+//   category_id: 1,
+//   is_free: true,
+//   is_new: false,
+//   difficulty_level: 'beginner,intermediate',
+//   nationality: 'domestic',
+//   sort: 'popular',
+//   page: 1,
+//   limit: 20
+// });
 ```
 
 ## 🔄 데이터 타입 정의

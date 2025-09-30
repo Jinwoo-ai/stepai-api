@@ -358,8 +358,17 @@ router.get('/:curationId/services', async (req, res) => {
       });
     }
 
+    // 로그인된 사용자 ID 추출
+    let userId = null;
+    if (req.headers.authorization) {
+      const token = req.headers.authorization.replace('Bearer ', '');
+      if (!isNaN(parseInt(token))) {
+        userId = parseInt(token);
+      }
+    }
+
     const pool = getDatabaseConnection();
-    const query = `
+    let query = `
       SELECT 
         cas.id,
         cas.ai_service_id,
@@ -373,22 +382,49 @@ router.get('/:curationId/services', async (req, res) => {
         ais.difficulty_level,
         ais.is_step_pick,
         ais.is_new,
-        GROUP_CONCAT(DISTINCT t.tag_name) as tags
+        GROUP_CONCAT(DISTINCT t.tag_name) as tags`;
+    
+    if (userId) {
+      query += `,
+        CASE WHEN uf.id IS NOT NULL THEN true ELSE false END as is_bookmarked`;
+    }
+    
+    query += `
       FROM curation_ai_services cas
       JOIN ai_services ais ON cas.ai_service_id = ais.id
       LEFT JOIN ai_service_tags ast ON ais.id = ast.ai_service_id
-      LEFT JOIN tags t ON ast.tag_id = t.id
+      LEFT JOIN tags t ON ast.tag_id = t.id`;
+    
+    if (userId) {
+      query += `
+      LEFT JOIN user_favorite_services uf ON ais.id = uf.ai_service_id AND uf.user_id = ?`;
+    }
+    
+    query += `
       WHERE cas.curation_id = ? AND ais.ai_status = 'active'
-      GROUP BY cas.id, cas.ai_service_id, cas.service_order, ais.ai_name, ais.ai_name_en, ais.ai_description, ais.ai_logo, ais.company_name, ais.pricing_info, ais.difficulty_level, ais.is_step_pick, ais.is_new
+      GROUP BY cas.id, cas.ai_service_id, cas.service_order, ais.ai_name, ais.ai_name_en, ais.ai_description, ais.ai_logo, ais.company_name, ais.pricing_info, ais.difficulty_level, ais.is_step_pick, ais.is_new`;
+    
+    if (userId) {
+      query += `, uf.id`;
+    }
+    
+    query += `
       ORDER BY cas.service_order ASC
     `;
 
-    const [rows] = await pool.execute<RowDataPacket[]>(query, [curationId]);
+    const params = [];
+    if (userId) {
+      params.push(userId);
+    }
+    params.push(curationId);
+
+    const [rows] = await pool.execute<RowDataPacket[]>(query, params);
     
-    // tags 필드를 배열로 변환
+    // tags 필드를 배열로 변환하고 북마크 정보 처리
     const processedRows = rows.map(row => ({
       ...row,
-      tags: row.tags ? row.tags.split(',') : []
+      tags: row.tags ? row.tags.split(',') : [],
+      is_bookmarked: userId ? !!row.is_bookmarked : undefined
     }));
     
     res.json({ success: true, data: processedRows });

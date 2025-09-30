@@ -23,15 +23,27 @@ router.get('/services', async (req, res) => {
         ais.ai_logo,
         ais.company_name,
         ais.is_step_pick,
-        ais.is_new
+        ais.is_new,
+        GROUP_CONCAT(DISTINCT t.tag_name) as tags
       FROM user_favorite_services ufs
       JOIN ai_services ais ON ufs.ai_service_id = ais.id
+      LEFT JOIN ai_service_tags ast ON ais.id = ast.ai_service_id
+      LEFT JOIN tags t ON ast.tag_id = t.id
       WHERE ufs.user_id = ? AND ais.ai_status = 'active'
+      GROUP BY ufs.id, ufs.ai_service_id, ufs.created_at, ais.ai_name, ais.ai_description, ais.ai_logo, ais.company_name, ais.is_step_pick, ais.is_new
       ORDER BY ufs.created_at DESC
     `;
 
     const [rows] = await pool.execute<RowDataPacket[]>(query, [userId]);
-    res.json({ success: true, data: rows });
+    
+    // tags 필드를 배열로 변환하고 is_bookmarked는 항상 true (관심 목록이므로)
+    const processedRows = rows.map(row => ({
+      ...row,
+      tags: row.tags ? row.tags.split(',') : [],
+      is_bookmarked: true
+    }));
+    
+    res.json({ success: true, data: processedRows });
   } catch (error) {
     console.error('관심 서비스 조회 실패:', error);
     res.status(500).json({ success: false, error: '관심 서비스 조회에 실패했습니다.' });
@@ -250,10 +262,16 @@ router.get('/', async (req, res) => {
         ais.ai_name as title,
         ais.ai_description as description,
         ais.ai_logo as image_url,
-        ais.company_name
+        ais.company_name,
+        ais.is_step_pick,
+        ais.is_new,
+        GROUP_CONCAT(DISTINCT t.tag_name) as tags
       FROM user_favorite_services ufs
       JOIN ai_services ais ON ufs.ai_service_id = ais.id
+      LEFT JOIN ai_service_tags ast ON ais.id = ast.ai_service_id
+      LEFT JOIN tags t ON ast.tag_id = t.id
       WHERE ufs.user_id = ? AND ais.ai_status = 'active'
+      GROUP BY ufs.ai_service_id, ufs.created_at, ais.ai_name, ais.ai_description, ais.ai_logo, ais.company_name, ais.is_step_pick, ais.is_new
     `;
 
     // 관심 영상 조회
@@ -274,15 +292,22 @@ router.get('/', async (req, res) => {
     const [services] = await pool.execute<RowDataPacket[]>(servicesQuery, [userId]);
     const [videos] = await pool.execute<RowDataPacket[]>(videosQuery, [userId]);
 
+    // 서비스 데이터 처리 (tags 배열 변환, is_bookmarked 추가)
+    const processedServices = services.map(service => ({
+      ...service,
+      tags: service.tags ? service.tags.split(',') : [],
+      is_bookmarked: true
+    }));
+
     // 통합하여 최신순 정렬
-    const allItems = [...services, ...videos].sort((a, b) => 
+    const allItems = [...processedServices, ...videos].sort((a: any, b: any) => 
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
     res.json({ 
       success: true, 
       data: {
-        services: services,
+        services: processedServices,
         videos: videos,
         all: allItems
       }
