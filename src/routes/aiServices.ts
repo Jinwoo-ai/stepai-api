@@ -599,6 +599,16 @@ router.get('/:id', async (req, res) => {
     const id = parseInt(req.params.id);
     const include_categories = req.query['include_categories'] !== 'false'; // 기본값을 true로 변경
     
+    if (isNaN(id)) {
+      return res.status(400).json({
+        success: false,
+        error: '유효하지 않은 서비스 ID입니다.'
+      });
+    }
+
+    const pool = getDatabaseConnection();
+    const connection = await pool.getConnection();
+    
     // 로그인된 사용자 ID 추출
     let userId = null;
     if (req.headers.authorization) {
@@ -616,16 +626,6 @@ router.get('/:id', async (req, res) => {
         console.log('사용자 토큰 조회 실패:', error.message);
       }
     }
-    
-    if (isNaN(id)) {
-      return res.status(400).json({
-        success: false,
-        error: '유효하지 않은 서비스 ID입니다.'
-      });
-    }
-
-    const pool = getDatabaseConnection();
-    const connection = await pool.getConnection();
     
     try {
       // AI 서비스 기본 정보 조회 (대표 카테고리 포함)

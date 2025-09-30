@@ -358,6 +358,8 @@ router.get('/:curationId/services', async (req, res) => {
       });
     }
 
+    const pool = getDatabaseConnection();
+    
     // 로그인된 사용자 ID 추출
     let userId = null;
     if (req.headers.authorization) {
@@ -374,8 +376,6 @@ router.get('/:curationId/services', async (req, res) => {
         console.log('사용자 토큰 조회 실패:', error.message);
       }
     }
-
-    const pool = getDatabaseConnection();
     let query = `
       SELECT 
         cas.id,
