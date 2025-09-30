@@ -145,7 +145,6 @@ router.post('/upload-excel', authenticateAdmin, upload.single('excel'), async (r
                   `UPDATE ai_services SET
                     ai_name_en = ?, ai_description = ?, ai_website = ?, ai_logo = ?,
                     company_name = ?, company_name_en = ?, embedded_video_url = ?, headquarters = ?,
-                    main_features = ?, target_users = ?, use_cases = ?,
                     pricing_info = ?, difficulty_level = ?, usage_availability = ?,
                     is_visible = ?, is_step_pick = ?, is_new = ?, updated_at = NOW()
                    WHERE id = ?`,
@@ -158,9 +157,6 @@ router.post('/upload-excel', authenticateAdmin, upload.single('excel'), async (r
                     row['기업명(영문)'] || null,
                     row['임베디드 영상 URL'] || null,
                     row['본사'] || null,
-                    row['주요기능'] || null,
-                    row['타겟 사용자'] || null,
-                    row['추천활용사례'] || null,
                     row['Price'] || null,
                     mapDifficultyLevel(row['난이도']) || 'beginner',
                     row['사용'] || null,
@@ -186,10 +182,9 @@ router.post('/upload-excel', authenticateAdmin, upload.single('excel'), async (r
                     `INSERT INTO ai_services (
                       id, ai_name, ai_name_en, ai_description, ai_website, ai_logo,
                       company_name, company_name_en, embedded_video_url, headquarters,
-                      main_features, target_users, use_cases,
                       pricing_info, difficulty_level, usage_availability,
                       ai_status, is_visible, is_step_pick, is_new
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                     [
                       numericId,
                       row['서비스명(국문)'],
@@ -201,9 +196,6 @@ router.post('/upload-excel', authenticateAdmin, upload.single('excel'), async (r
                       row['기업명(영문)'] || null,
                       row['임베디드 영상 URL'] || null,
                       row['본사'] || null,
-                      row['주요기능'] || null,
-                      row['타겟 사용자'] || null,
-                      row['추천활용사례'] || null,
                       row['Price'] || null,
                       mapDifficultyLevel(row['난이도']) || 'beginner',
                       row['사용'] || null,
@@ -219,10 +211,9 @@ router.post('/upload-excel', authenticateAdmin, upload.single('excel'), async (r
                     `INSERT INTO ai_services (
                       ai_name, ai_name_en, ai_description, ai_website, ai_logo,
                       company_name, company_name_en, embedded_video_url, headquarters,
-                      main_features, target_users, use_cases,
                       pricing_info, difficulty_level, usage_availability,
                       ai_status, is_visible, is_step_pick, is_new
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                     [
                       row['서비스명(국문)'],
                       row['서비스명(영문)'] || null,
@@ -233,9 +224,6 @@ router.post('/upload-excel', authenticateAdmin, upload.single('excel'), async (r
                       row['기업명(영문)'] || null,
                       row['임베디드 영상 URL'] || null,
                       row['본사'] || null,
-                      row['주요기능'] || null,
-                      row['타겟 사용자'] || null,
-                      row['추천활용사례'] || null,
                       row['Price'] || null,
                       mapDifficultyLevel(row['난이도']) || 'beginner',
                       row['사용'] || null,

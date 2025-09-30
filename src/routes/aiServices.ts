@@ -814,8 +814,8 @@ router.get('/', async (req, res) => {
       const queryParams: any[] = [];
 
       if (search) {
-        whereConditions.push('(ai_services.ai_name LIKE ? OR ai_services.ai_description LIKE ?)');
-        queryParams.push(`%${search}%`, `%${search}%`);
+        whereConditions.push('(ai_services.ai_name LIKE ? OR COALESCE(ai_services.ai_name_en, \'\') LIKE ? OR ai_services.ai_description LIKE ?)');
+        queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
       }
 
       if (category_id) {

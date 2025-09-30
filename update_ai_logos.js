@@ -8,7 +8,7 @@ async function updateAiLogos() {
     port: 13001,
     user: 'admin',
     password: 'spib5aslzaspIdude3r8',
-    database: 'STEPAI_TEST'
+    database: 'STEPAI'
   });
 
   try {
