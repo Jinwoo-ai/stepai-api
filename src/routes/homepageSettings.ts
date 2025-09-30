@@ -171,8 +171,16 @@ router.get('/step-pick', async (req, res) => {
     let userId = null;
     if (req.headers.authorization) {
       const token = req.headers.authorization.replace('Bearer ', '');
-      if (!isNaN(parseInt(token))) {
-        userId = parseInt(token);
+      try {
+        const [userResult] = await pool.execute<RowDataPacket[]>(
+          'SELECT id FROM users WHERE access_token = ?',
+          [token]
+        );
+        if (userResult.length > 0) {
+          userId = userResult[0].id;
+        }
+      } catch (error) {
+        console.log('사용자 토큰 조회 실패:', error.message);
       }
     }
     
@@ -420,14 +428,20 @@ router.get('/trends/:sectionId/services', async (req, res) => {
     const pool = getDatabaseConnection();
     const sectionId = parseInt(req.params.sectionId);
     const categoryId = req.query.category_id as string;
-    // Authorization 헤더에서 사용자 ID 추출 (실제로는 토큰 검증 로직 필요)
+    // Authorization 헤더에서 사용자 ID 추출
     let userId = null;
     if (req.headers.authorization) {
       const token = req.headers.authorization.replace('Bearer ', '');
-      // 실제 구현에서는 토큰을 검증하고 사용자 ID를 추출해야 함
-      // 여기서는 간단히 숫자인 경우만 처리
-      if (!isNaN(parseInt(token))) {
-        userId = parseInt(token);
+      try {
+        const [userResult] = await pool.execute<RowDataPacket[]>(
+          'SELECT id FROM users WHERE access_token = ?',
+          [token]
+        );
+        if (userResult.length > 0) {
+          userId = userResult[0].id;
+        }
+      } catch (error) {
+        console.log('사용자 토큰 조회 실패:', error.message);
       }
     }
     
@@ -760,8 +774,16 @@ router.get('/', async (req, res) => {
     let userId = null;
     if (req.headers.authorization) {
       const token = req.headers.authorization.replace('Bearer ', '');
-      if (!isNaN(parseInt(token))) {
-        userId = parseInt(token);
+      try {
+        const [userResult] = await pool.execute<RowDataPacket[]>(
+          'SELECT id FROM users WHERE access_token = ?',
+          [token]
+        );
+        if (userResult.length > 0) {
+          userId = userResult[0].id;
+        }
+      } catch (error) {
+        console.log('사용자 토큰 조회 실패:', error.message);
       }
     }
     

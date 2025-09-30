@@ -18,8 +18,17 @@ router.get('/', async (req, res) => {
     let userId = null;
     if (req.headers.authorization) {
       const token = req.headers.authorization.replace('Bearer ', '');
-      if (!isNaN(parseInt(token))) {
-        userId = parseInt(token);
+      try {
+        const pool = getDatabaseConnection();
+        const [userResult] = await pool.execute<RowDataPacket[]>(
+          'SELECT id FROM users WHERE access_token = ?',
+          [token]
+        );
+        if (userResult.length > 0) {
+          userId = userResult[0].id;
+        }
+      } catch (error) {
+        console.log('사용자 토큰 조회 실패:', error.message);
       }
     }
 
@@ -466,8 +475,17 @@ router.get('/:id', async (req, res) => {
     let userId = null;
     if (req.headers.authorization) {
       const token = req.headers.authorization.replace('Bearer ', '');
-      if (!isNaN(parseInt(token))) {
-        userId = parseInt(token);
+      try {
+        const pool = getDatabaseConnection();
+        const [userResult] = await pool.execute<RowDataPacket[]>(
+          'SELECT id FROM users WHERE access_token = ?',
+          [token]
+        );
+        if (userResult.length > 0) {
+          userId = userResult[0].id;
+        }
+      } catch (error) {
+        console.log('사용자 토큰 조회 실패:', error.message);
       }
     }
 
