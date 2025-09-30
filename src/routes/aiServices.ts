@@ -962,135 +962,142 @@ router.get('/', async (req, res) => {
       serviceQueryParams.push(...queryParams, limit, offset);
       
       const [services] = await connection.execute<RowDataPacket[]>(serviceQuery, serviceQueryParams);
-
-      // 카테고리 정보 포함
-      const servicesWithCategories = [];
-      for (const service of services) {
-        let serviceData = { ...service };
+      
+      if (services.length === 0) {
+        return res.json({
+          success: true,
+          data: {
+            data: [],
+            pagination: { page, limit, total, totalPages }
+          }
+        });
+      }
+      
+      const serviceIds = services.map(s => s.id);
+      const placeholders = serviceIds.map(() => '?').join(',');
+      
+      // Bulk 조회: 카테고리
+      const [allCategories] = await connection.execute<RowDataPacket[]>(
+        include_categories 
+          ? `SELECT ascat.ai_service_id, c.id, c.category_name, c.parent_id, ascat.is_main_category, p.category_name as parent_category_name
+             FROM ai_service_categories ascat
+             INNER JOIN categories c ON ascat.category_id = c.id
+             LEFT JOIN categories p ON c.parent_id = p.id
+             WHERE ascat.ai_service_id IN (${placeholders})
+             ORDER BY ascat.is_main_category DESC, c.category_name`
+          : `SELECT ascat.ai_service_id, c.id, c.category_name, ascat.is_main_category
+             FROM ai_service_categories ascat
+             INNER JOIN categories c ON ascat.category_id = c.id
+             WHERE ascat.ai_service_id IN (${placeholders})
+             ORDER BY ascat.is_main_category DESC, c.category_name`,
+        serviceIds
+      );
+      
+      // Bulk 조회: 태그
+      const [allTags] = await connection.execute<RowDataPacket[]>(
+        `SELECT ast.ai_service_id, t.id, t.tag_name
+         FROM ai_service_tags ast
+         INNER JOIN tags t ON ast.tag_id = t.id
+         WHERE ast.ai_service_id IN (${placeholders})
+         ORDER BY t.tag_name`,
+        serviceIds
+      );
+      
+      // Bulk 조회: AI 타입
+      const [allAiTypes] = await connection.execute<RowDataPacket[]>(
+        `SELECT ast.ai_service_id, at.type_name
+         FROM ai_service_types ast
+         INNER JOIN ai_types at ON ast.ai_type_id = at.id
+         WHERE ast.ai_service_id IN (${placeholders})
+         ORDER BY at.type_name`,
+        serviceIds
+      );
+      
+      // Bulk 조회: 가격 모델
+      const [allPricingModels] = await connection.execute<RowDataPacket[]>(
+        `SELECT aspm.ai_service_id, pm.model_name
+         FROM ai_service_pricing_models aspm
+         INNER JOIN pricing_models pm ON aspm.pricing_model_id = pm.id
+         WHERE aspm.ai_service_id IN (${placeholders})
+         ORDER BY pm.model_name`,
+        serviceIds
+      );
+      
+      // 데이터 매핑
+      const categoryMap = new Map();
+      const tagMap = new Map();
+      const aiTypeMap = new Map();
+      const pricingModelMap = new Map();
+      
+      allCategories.forEach(cat => {
+        if (!categoryMap.has(cat.ai_service_id)) categoryMap.set(cat.ai_service_id, []);
+        categoryMap.get(cat.ai_service_id).push(cat);
+      });
+      
+      allTags.forEach(tag => {
+        if (!tagMap.has(tag.ai_service_id)) tagMap.set(tag.ai_service_id, []);
+        tagMap.get(tag.ai_service_id).push(tag);
+      });
+      
+      allAiTypes.forEach(type => {
+        if (!aiTypeMap.has(type.ai_service_id)) aiTypeMap.set(type.ai_service_id, []);
+        aiTypeMap.get(type.ai_service_id).push(type);
+      });
+      
+      allPricingModels.forEach(model => {
+        if (!pricingModelMap.has(model.ai_service_id)) pricingModelMap.set(model.ai_service_id, []);
+        pricingModelMap.get(model.ai_service_id).push(model);
+      });
+      
+      // 서비스 데이터 구성
+      const servicesWithCategories = services.map(service => {
+        const serviceData = { ...service };
         
-        // 대표 카테고리 정보 추가
+        // 대표 카테고리 정보
         serviceData['category_id'] = service['main_category_id'];
         serviceData['category_name'] = service['main_category_name'];
         
-        if (include_categories) {
-          const [categories] = await connection.execute<RowDataPacket[]>(
-            `SELECT c.id, c.category_name, c.parent_id, ascat.is_main_category,
-                    p.category_name as parent_category_name
-             FROM categories c 
-             INNER JOIN ai_service_categories ascat ON c.id = ascat.category_id 
-             LEFT JOIN categories p ON c.parent_id = p.id
-             WHERE ascat.ai_service_id = ?`,
-            [service['id']]
-          );
-          serviceData['categories'] = categories;
-        } else {
-          // include_categories가 false인 경우도 모든 카테고리 정보 제공
-          const [categories] = await connection.execute<RowDataPacket[]>(
-            `SELECT c.id, c.category_name, ascat.is_main_category
-             FROM ai_service_categories ascat
-             INNER JOIN categories c ON ascat.category_id = c.id
-             WHERE ascat.ai_service_id = ?
-             ORDER BY ascat.is_main_category DESC, c.category_name`,
-            [service['id']]
-          );
-          serviceData['categories'] = categories;
-        }
+        // 카테고리
+        serviceData['categories'] = categoryMap.get(service.id) || [];
         
-        // 태그 정보 포함
-        const [tags] = await connection.execute<RowDataPacket[]>(
-          `SELECT t.id, t.tag_name
-           FROM tags t
-           INNER JOIN ai_service_tags ast ON t.id = ast.tag_id
-           WHERE ast.ai_service_id = ?
-           ORDER BY t.tag_name`,
-          [service['id']]
-        );
-        serviceData['tags'] = tags.map(tag => tag['tag_name']).join(' #');
-        if (serviceData['tags']) serviceData['tags'] = '#' + serviceData['tags'];
-        serviceData['tag_ids'] = tags.map(tag => tag['id']);
+        // 태그
+        const tags = tagMap.get(service.id) || [];
+        serviceData['tags'] = tags.length > 0 ? '#' + tags.map(t => t.tag_name).join(' #') : '';
+        serviceData['tag_ids'] = tags.map(t => t.id);
         
-        // AI 타입 정보 포함
-        const [aiTypes] = await connection.execute<RowDataPacket[]>(
-          `SELECT at.type_name
-           FROM ai_types at
-           INNER JOIN ai_service_types ast ON at.id = ast.ai_type_id
-           WHERE ast.ai_service_id = ?
-           ORDER BY at.type_name`,
-          [service['id']]
-        );
-        serviceData['ai_types'] = aiTypes.map(type => type['type_name']);
-        serviceData['ai_type'] = aiTypes.map(type => type['type_name']).join(', '); // 호환성을 위한 필드
+        // AI 타입
+        const aiTypes = aiTypeMap.get(service.id) || [];
+        serviceData['ai_types'] = aiTypes.map(t => t.type_name);
+        serviceData['ai_type'] = aiTypes.map(t => t.type_name).join(', ');
         
-        // 가격 모델 정보 포함
-        const [pricingModels] = await connection.execute<RowDataPacket[]>(
-          `SELECT pm.model_name
-           FROM pricing_models pm
-           INNER JOIN ai_service_pricing_models aspm ON pm.id = aspm.pricing_model_id
-           WHERE aspm.ai_service_id = ?
-           ORDER BY pm.model_name`,
-          [service['id']]
-        );
-        serviceData['pricing_models'] = pricingModels.map(model => model['model_name']);
+        // 가격 모델
+        serviceData['pricing_models'] = (pricingModelMap.get(service.id) || []).map(m => m.model_name);
         
-        // 타겟 타입 정보 포함
-        const [targetTypes] = await connection.execute<RowDataPacket[]>(
-          `SELECT tt.type_code, tt.type_name
-           FROM target_types tt
-           INNER JOIN ai_service_target_types astt ON tt.id = astt.target_type_id
-           WHERE astt.ai_service_id = ?
-           ORDER BY tt.type_code`,
-          [service['id']]
-        );
-        serviceData['target_types'] = targetTypes.map(type => ({ code: type['type_code'], name: type['type_name'] }));
-        
-        // 유사 서비스 정보 포함
-        const [similarServices] = await connection.execute<RowDataPacket[]>(
-          `SELECT s.id, s.ai_name, COALESCE(s.ai_name_en, '') as ai_name_en, s.ai_logo, s.company_name
-           FROM ai_services s
-           INNER JOIN ai_service_similar_services ass ON s.id = ass.similar_service_id
-           WHERE ass.ai_service_id = ?
-           ORDER BY s.ai_name`,
-          [service['id']]
-        );
-        serviceData['similar_services_list'] = similarServices;
-        
-        // 콘텐츠 정보 포함
-        const [contents] = await connection.execute<RowDataPacket[]>(
-          `SELECT content_type, content_title, content_text, content_order
-           FROM ai_service_contents
-           WHERE ai_service_id = ?
-           ORDER BY content_order`,
-          [service['id']]
-        );
-        serviceData['contents'] = contents;
-        
-        // flag_icon 추가
-        const headquarters = serviceData['headquarters'];
+        // flag_icon
         const baseUrl = process.env.BASE_URL || 'https://stepai-admin-production.up.railway.app';
+        const headquarters = serviceData['headquarters'];
         if (headquarters) {
           const flagPath = path.join(process.cwd(), 'public/uploads/icons', `${headquarters}.png`);
-          if (fs.existsSync(flagPath)) {
-            serviceData['flag_icon'] = `${baseUrl}/uploads/icons/${headquarters}.png`;
-          } else {
-            serviceData['flag_icon'] = `${baseUrl}/uploads/icons/국가없음.png`;
-          }
+          serviceData['flag_icon'] = fs.existsSync(flagPath) 
+            ? `${baseUrl}/uploads/icons/${headquarters}.png`
+            : `${baseUrl}/uploads/icons/국가없음.png`;
         } else {
           serviceData['flag_icon'] = `${baseUrl}/uploads/icons/국가없음.png`;
         }
         
-        // 북마크 정보 추가
+        // 북마크 정보
         if (userId) {
           serviceData['is_bookmarked'] = !!service['is_bookmarked'];
-          console.log(`Service ${service.id} bookmark status:`, serviceData['is_bookmarked']);
-        } else {
-          console.log('No userId, skipping bookmark check');
         }
         
-        // ai_service_id 필드 추가
+        // 기타 필드
         serviceData['ai_service_id'] = serviceData['id'];
+        serviceData['target_types'] = [];
+        serviceData['similar_services_list'] = [];
+        serviceData['contents'] = [];
         
-        servicesWithCategories.push(serviceData);
-      }
+        return serviceData;
+      });
 
       res.json({
         success: true,
