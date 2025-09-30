@@ -62,8 +62,8 @@ router.get('/available-services', async (req, res) => {
     const params: any[] = [categoryId];
 
     if (search) {
-      query += ` AND (ais.ai_name LIKE ? OR COALESCE(ais.ai_name_en, '') LIKE ? OR ais.ai_description LIKE ?)`;
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      query += ` AND (ais.ai_name LIKE ? OR COALESCE(ais.ai_name_en, '') LIKE ? OR COALESCE(ais.company_name, '') LIKE ? OR COALESCE(ais.company_name_en, '') LIKE ?)`;
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
 
     query += ` ORDER BY ais.ai_name ASC LIMIT ?`;

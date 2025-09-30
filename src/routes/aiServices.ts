@@ -200,7 +200,7 @@ router.get('/admin-search', async (req, res) => {
          FROM ai_services s
          LEFT JOIN ai_service_categories ascat ON s.id = ascat.ai_service_id AND ascat.is_main_category = 1
          LEFT JOIN categories c ON ascat.category_id = c.id
-         WHERE (s.ai_name LIKE ? OR s.ai_name_en LIKE ? OR s.company_name LIKE ? OR s.ai_description LIKE ?) 
+         WHERE (s.ai_name LIKE ? OR COALESCE(s.ai_name_en, '') LIKE ? OR COALESCE(s.company_name, '') LIKE ? OR COALESCE(s.company_name_en, '') LIKE ?) 
          AND s.deleted_at IS NULL
          ORDER BY s.ai_name
          LIMIT 50`,
@@ -412,11 +412,11 @@ router.get('/search', async (req, res) => {
            FROM ai_services s
            LEFT JOIN ai_service_categories ascat ON s.id = ascat.ai_service_id AND ascat.is_main_category = 1
            LEFT JOIN categories c ON ascat.category_id = c.id
-           WHERE (s.ai_name LIKE ? OR s.ai_name_en LIKE ? OR s.company_name LIKE ? OR s.ai_description LIKE ?) 
+           WHERE (s.ai_name LIKE ? OR s.ai_name_en LIKE ? OR s.company_name LIKE ? OR s.ai_description LIKE ? OR COALESCE(s.company_name_en, '') LIKE ?) 
            AND s.deleted_at IS NULL AND s.ai_status = 'active'
            ORDER BY s.ai_name
            LIMIT 20`,
-          [`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`]
+          [`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`]
         );
         
         // 각 서비스의 모든 카테고리 정보 조회
@@ -843,8 +843,8 @@ router.get('/', async (req, res) => {
       const queryParams: any[] = [];
 
       if (search) {
-        whereConditions.push('(ai_services.ai_name LIKE ? OR COALESCE(ai_services.ai_name_en, \'\') LIKE ? OR ai_services.ai_description LIKE ?)');
-        queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        whereConditions.push('(ai_services.ai_name LIKE ? OR COALESCE(ai_services.ai_name_en, \'\') LIKE ? OR COALESCE(ai_services.company_name, \'\') LIKE ? OR COALESCE(ai_services.company_name_en, \'\') LIKE ?)');
+        queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
       }
 
       if (category_id) {
