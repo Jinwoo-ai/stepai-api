@@ -96,7 +96,7 @@ router.get('/', async (req, res) => {
           
           for (const serviceLink of serviceIds) {
             const [services] = await connection.execute<RowDataPacket[]>(
-              'SELECT id, ai_name, ai_description, ai_logo, company_name, difficulty_level, is_step_pick, is_new FROM ai_services WHERE id = ?',
+              'SELECT id, ai_name, COALESCE(ai_name_en, \'\') as ai_name_en, ai_description, ai_logo, company_name, difficulty_level, is_step_pick, is_new FROM ai_services WHERE id = ?',
               [serviceLink.ai_service_id]
             );
             
@@ -516,7 +516,7 @@ router.get('/:id', async (req, res) => {
         
         for (const serviceLink of serviceIds) {
           const [services] = await connection.execute<RowDataPacket[]>(
-            'SELECT id, ai_name, ai_description, ai_logo, company_name, difficulty_level, is_step_pick, is_new FROM ai_services WHERE id = ?',
+            'SELECT id, ai_name, COALESCE(ai_name_en, \'\') as ai_name_en, ai_description, ai_logo, company_name, difficulty_level, is_step_pick, is_new FROM ai_services WHERE id = ?',
             [serviceLink.ai_service_id]
           );
           

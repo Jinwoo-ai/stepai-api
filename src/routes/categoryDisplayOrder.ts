@@ -42,6 +42,7 @@ router.get('/available-services', async (req, res) => {
       SELECT 
         ais.id,
         ais.ai_name,
+        COALESCE(ais.ai_name_en, '') as ai_name_en,
         ais.ai_description,
         ais.ai_logo,
         ais.company_name,
@@ -139,6 +140,7 @@ router.get('/:categoryId', async (req, res) => {
         asdo.display_order,
         asdo.is_featured,
         ais.ai_name,
+        COALESCE(ais.ai_name_en, '') as ai_name_en,
         ais.ai_description,
         ais.ai_logo,
         ais.company_name,

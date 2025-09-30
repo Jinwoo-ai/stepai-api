@@ -34,7 +34,7 @@ router.get('/:id/items', async (req, res) => {
     try {
       // AI 서비스 목록
       const [services] = await connection.execute<RowDataPacket[]>(
-        `SELECT s.id, s.ai_name, s.created_at
+        `SELECT s.id, s.ai_name, COALESCE(s.ai_name_en, '') as ai_name_en, s.created_at
          FROM ai_services s
          INNER JOIN ai_service_tags ast ON s.id = ast.ai_service_id
          WHERE ast.tag_id = ? AND s.deleted_at IS NULL
