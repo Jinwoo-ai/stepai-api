@@ -19,6 +19,7 @@ router.get('/services', async (req, res) => {
         ufs.ai_service_id,
         ufs.created_at,
         ais.ai_name,
+        COALESCE(ais.ai_name_en, '') as ai_name_en,
         ais.ai_description,
         ais.ai_logo,
         ais.company_name,
@@ -30,7 +31,7 @@ router.get('/services', async (req, res) => {
       LEFT JOIN ai_service_tags ast ON ais.id = ast.ai_service_id
       LEFT JOIN tags t ON ast.tag_id = t.id
       WHERE ufs.user_id = ? AND ais.ai_status = 'active'
-      GROUP BY ufs.id, ufs.ai_service_id, ufs.created_at, ais.ai_name, ais.ai_description, ais.ai_logo, ais.company_name, ais.is_step_pick, ais.is_new
+      GROUP BY ufs.id, ufs.ai_service_id, ufs.created_at, ais.ai_name, ais.ai_name_en, ais.ai_description, ais.ai_logo, ais.company_name, ais.is_step_pick, ais.is_new
       ORDER BY ufs.created_at DESC
     `;
 
@@ -260,6 +261,7 @@ router.get('/', async (req, res) => {
         ufs.ai_service_id as item_id,
         ufs.created_at,
         ais.ai_name as title,
+        COALESCE(ais.ai_name_en, '') as ai_name_en,
         ais.ai_description as description,
         ais.ai_logo as image_url,
         ais.company_name,
@@ -271,7 +273,7 @@ router.get('/', async (req, res) => {
       LEFT JOIN ai_service_tags ast ON ais.id = ast.ai_service_id
       LEFT JOIN tags t ON ast.tag_id = t.id
       WHERE ufs.user_id = ? AND ais.ai_status = 'active'
-      GROUP BY ufs.ai_service_id, ufs.created_at, ais.ai_name, ais.ai_description, ais.ai_logo, ais.company_name, ais.is_step_pick, ais.is_new
+      GROUP BY ufs.ai_service_id, ufs.created_at, ais.ai_name, ais.ai_name_en, ais.ai_description, ais.ai_logo, ais.company_name, ais.is_step_pick, ais.is_new
     `;
 
     // 관심 영상 조회
