@@ -48,7 +48,33 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // 디버깅용 로깅 미들웨어
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`);
+  const timestamp = new Date().toISOString();
+  let logMessage = `[${timestamp}] ${req.method} ${req.path}`;
+  
+  // Query parameters 추가
+  if (Object.keys(req.query).length > 0) {
+    logMessage += ` | Query: ${JSON.stringify(req.query)}`;
+  }
+  
+  // Body parameters 추가 (POST, PUT, PATCH 요청의 경우)
+  if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body && Object.keys(req.body).length > 0) {
+    // 민감한 정보 필터링 (비밀번호 등)
+    const filteredBody = { ...req.body };
+    if (filteredBody.password) filteredBody.password = '[FILTERED]';
+    if (filteredBody.admin_password) filteredBody.admin_password = '[FILTERED]';
+    logMessage += ` | Body: ${JSON.stringify(filteredBody)}`;
+  }
+  
+  // Headers에서 Authorization 정보 추가 (토큰은 마스킹)
+  if (req.headers.authorization) {
+    const authHeader = req.headers.authorization;
+    const maskedAuth = authHeader.length > 20 
+      ? authHeader.substring(0, 20) + '...[MASKED]'
+      : '[MASKED]';
+    logMessage += ` | Auth: ${maskedAuth}`;
+  }
+  
+  console.log(logMessage);
   next();
 });
 
